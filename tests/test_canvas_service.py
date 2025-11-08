@@ -3,20 +3,13 @@ Test script for Canvas Service
 Run this to verify the canvas_service functions work correctly.
 
 Usage:
-    python tests/test_canvas_service.py
+    python -m app.services.test_canvas_service
 """
-import sys
-import os
-
-# Add parent directory to path to import from app.services
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from dotenv import load_dotenv
 import json
-from app.services.canvas_service import get_course_files, get_syllabus, get_course_info
-
-# Load environment variables
-load_dotenv()
+from canvas_service import get_course_files, get_syllabus, get_course_info
+import json
+import os
+from canvas_service import get_course_files, get_syllabus, get_course_info
 
 
 def test_get_course_files():
@@ -28,10 +21,10 @@ def test_get_course_files():
     print("TEST: get_course_files()")
     print("="*60)
 
-    COURSE_ID = os.environ.get('CANVAS_TEST_COURSE_ID')
-    CANVAS_TOKEN = os.environ.get('CANVAS_API_TOKEN')
+    COURSE_ID = os.environ.get('CANVAS_TEST_COURSE_ID', 'YOUR_COURSE_ID')
+    CANVAS_TOKEN = os.environ.get('CANVAS_API_TOKEN', 'YOUR_CANVAS_API_TOKEN')
 
-    if not COURSE_ID or not CANVAS_TOKEN:
+    if COURSE_ID == "YOUR_COURSE_ID" or CANVAS_TOKEN == "YOUR_CANVAS_API_TOKEN":
         print("⚠️  Please set CANVAS_TEST_COURSE_ID and CANVAS_API_TOKEN in your .env file")
         return False
     
@@ -55,8 +48,6 @@ def test_get_course_files():
         
     except Exception as e:
         print(f"\n❌ Error: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return False
 
 
@@ -68,10 +59,10 @@ def test_get_syllabus():
     print("TEST: get_syllabus()")
     print("="*60)
 
-    COURSE_ID = os.environ.get('CANVAS_TEST_COURSE_ID')
-    CANVAS_TOKEN = os.environ.get('CANVAS_API_TOKEN')
+    COURSE_ID = os.environ.get('CANVAS_TEST_COURSE_ID', 'YOUR_COURSE_ID')
+    CANVAS_TOKEN = os.environ.get('CANVAS_API_TOKEN', 'YOUR_CANVAS_API_TOKEN')
 
-    if not COURSE_ID or not CANVAS_TOKEN:
+    if COURSE_ID == "YOUR_COURSE_ID" or CANVAS_TOKEN == "YOUR_CANVAS_API_TOKEN":
         print("⚠️  Please set CANVAS_TEST_COURSE_ID and CANVAS_API_TOKEN in your .env file")
         return False
     
@@ -79,21 +70,19 @@ def test_get_syllabus():
         syllabus = get_syllabus(COURSE_ID, CANVAS_TOKEN)
         
         print(f"\n✅ Successfully retrieved syllabus")
+        print(f"   Length: {len(syllabus)} characters")
         
         if syllabus:
-            print(f"   Length: {len(syllabus)} characters")
             # Print first 200 characters
             preview = syllabus[:200] + "..." if len(syllabus) > 200 else syllabus
             print(f"\n📝 Preview:\n{preview}")
         else:
-            print("   ⚠️  Syllabus is empty or not set for this course")
+            print("\n⚠️  Syllabus is empty")
         
         return True
         
     except Exception as e:
         print(f"\n❌ Error: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return False
 
 
@@ -105,10 +94,10 @@ def test_get_course_info():
     print("TEST: get_course_info()")
     print("="*60)
 
-    COURSE_ID = os.environ.get('CANVAS_TEST_COURSE_ID')
-    CANVAS_TOKEN = os.environ.get('CANVAS_API_TOKEN')
+    COURSE_ID = os.environ.get('CANVAS_TEST_COURSE_ID', 'YOUR_COURSE_ID')
+    CANVAS_TOKEN = os.environ.get('CANVAS_API_TOKEN', 'YOUR_CANVAS_API_TOKEN')
 
-    if not COURSE_ID or not CANVAS_TOKEN:
+    if COURSE_ID == "YOUR_COURSE_ID" or CANVAS_TOKEN == "YOUR_CANVAS_API_TOKEN":
         print("⚠️  Please set CANVAS_TEST_COURSE_ID and CANVAS_API_TOKEN in your .env file")
         return False
 
@@ -122,8 +111,6 @@ def test_get_course_info():
 
     except Exception as e:
         print(f"\n❌ Error: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return False
 
 
@@ -142,22 +129,20 @@ def run_mock_test():
     
     print("\n📋 To run real tests:")
     print("   1. Set CANVAS_TEST_COURSE_ID and CANVAS_API_TOKEN in your .env file")
-    print("   2. Run: python tests/test_canvas_service.py")
+    print("   2. Run: python -m app.services.test_canvas_service")
 
     print("\n" + "="*60)
 
 
-def main():
-    """Run all tests."""
+if __name__ == "__main__":
     print("\n🧪 Canvas Service Test Suite")
     print("="*60)
 
-    COURSE_ID = os.environ.get('CANVAS_TEST_COURSE_ID')
-    CANVAS_TOKEN = os.environ.get('CANVAS_API_TOKEN')
+    COURSE_ID = os.environ.get('CANVAS_TEST_COURSE_ID', 'YOUR_COURSE_ID')
+    CANVAS_TOKEN = os.environ.get('CANVAS_API_TOKEN', 'YOUR_CANVAS_API_TOKEN')
 
-    if not COURSE_ID or not CANVAS_TOKEN:
+    if COURSE_ID == "YOUR_COURSE_ID" or CANVAS_TOKEN == "YOUR_CANVAS_API_TOKEN":
         run_mock_test()
-        return False
     else:
         # Run real tests
         results = []
@@ -172,15 +157,4 @@ def main():
         for name, passed in results:
             status = "✅ PASSED" if passed else "❌ FAILED"
             print(f"{status}: {name}")
-        
-        passed_count = sum(1 for _, passed in results if passed)
-        total_count = len(results)
-        print(f"\nPassed: {passed_count}/{total_count}")
         print("="*60 + "\n")
-        
-        return passed_count == total_count
-
-
-if __name__ == "__main__":
-    success = main()
-    sys.exit(0 if success else 1)
