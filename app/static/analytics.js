@@ -102,7 +102,6 @@ async function regenerateReport() {
             throw new Error(error.message || 'Failed to regenerate report');
         }
 
-        const result = await response.json();
 
         // Show success message
         alert('Analytics report regenerated successfully!');
