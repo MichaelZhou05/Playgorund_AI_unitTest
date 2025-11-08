@@ -13,7 +13,7 @@ This service handles all LLM prompting and response formatting.
 from vertexai.generative_models import GenerativeModel
 import os
 import logging
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple
 import vertexai
 import sys
 
