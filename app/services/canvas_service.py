@@ -142,7 +142,6 @@ def _download_files(files: list, token: str, course_id: str, output_dir: str = N
         course_id: The Canvas course ID (for default directory naming)
         output_dir: Directory to save files (default: app/data/courses/{course_id}/)
     """
-    import tempfile
     
     # Use provided directory or create course-specific directory
     if output_dir is None:
@@ -158,7 +157,7 @@ def _download_files(files: list, token: str, course_id: str, output_dir: str = N
     download_count = 0
     headers = {'Authorization': f'Bearer {token}'}
     
-    for file in files[:1]:
+    for file in files:
         try:
             file_id = file.get('id')
             display_name = file.get('display_name', f"file_{file_id}")

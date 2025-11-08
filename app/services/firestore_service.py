@@ -18,15 +18,12 @@ def get_course_state(course_id: str) -> str:
         course_id: The Canvas course ID (context_id)
         
     Returns:
-        One of: 'NEEDS_INIT', 'NOT_READY', 'GENERATING', 'ACTIVE'
+        One of: 'NEEDS_INIT', 'GENERATING', 'ACTIVE'
     """
     doc = db.collection(COURSES_COLLECTION).document(course_id).get()
     
     if not doc.exists:
-        # TODO: Determine if user is professor or student
-        # For now, return NEEDS_INIT
         return 'NEEDS_INIT'
-    
     status = doc.get('status')
     if status == 'GENERATING':
         return 'GENERATING'
@@ -36,18 +33,21 @@ def get_course_state(course_id: str) -> str:
         return 'NOT_READY'
 
 
-def create_course_doc(course_id: str):
+
+def create_course_doc(course_id: str) -> None:
     """
     Creates the initial course document with GENERATING status.
     
     Args:
         course_id: The Canvas course ID
     """
+    #sets status to GENERATING
     db.collection(COURSES_COLLECTION).document(course_id).set({
         'status': 'GENERATING'
     })
 
 
+# returns the google.cloud.firestore.document.DocumentSnapshot class
 def get_course_data(course_id: str):
     """
     Fetches the complete course document.
@@ -61,7 +61,11 @@ def get_course_data(course_id: str):
     return db.collection(COURSES_COLLECTION).document(course_id).get()
 
 
-def finalize_course_doc(course_id: str, data: dict):
+
+
+# call with dictionary of:
+# corpus_id, indexed_files, kg_nodes, kg_edges, kg_data
+def finalize_course_doc(course_id: str, data: dict) -> None:
     """
     Updates the course document with all RAG/KG data and sets status to ACTIVE.
     

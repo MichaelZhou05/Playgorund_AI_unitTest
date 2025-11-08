@@ -12,9 +12,10 @@ Answer generation should be handled by a separate LLM service.
 """
 import vertexai
 from vertexai.preview import rag
-from vertexai.preview.rag.utils.resources import RagCorpus, RagFile
+from vertexai.generative_models import GenerativeModel
 import os
 import logging
+import re
 from typing import List, Tuple, Dict
 
 logger = logging.getLogger(__name__)
@@ -183,7 +184,6 @@ def retrieve_context(corpus_id: str, query: str, top_k: int = 10, threshold: flo
 if __name__ == "__main__":
     # Load environment variables from root .env file
     from dotenv import load_dotenv
-    import sys
     
     # Get the root directory (2 levels up from this file)
     root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -195,7 +195,7 @@ if __name__ == "__main__":
     project_id = os.environ.get('GOOGLE_CLOUD_PROJECT')
     location = os.environ.get('GOOGLE_CLOUD_LOCATION')
 
-    print(f"GOOGLE_CLOUD_LOCATION: {location}")
+    logger.info(f"GOOGLE_CLOUD_LOCATION: {location}")
 
     vertexai.init(project=project_id, location=location)
 
