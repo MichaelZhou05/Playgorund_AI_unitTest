@@ -2,6 +2,12 @@
 Development server entry point.
 Run this file to start the Flask application.
 """
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file in root directory
+load_dotenv()
+
 from app import create_app
 
 app = create_app()

@@ -11,13 +11,14 @@ All functions use the Canvas REST API and handle authentication via API tokens.
 import requests
 from typing import Tuple, Dict, List
 import logging
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Canvas API configuration
-CANVAS_API_BASE = "https://canvas.instructure.com/api/v1"
+# Canvas API configuration from environment variables
+CANVAS_API_BASE = os.environ.get('CANVAS_BASE_URL', 'https://canvas.instructure.com/api/v1')
 ALLOWED_FILE_TYPES = ['.pdf', '.txt', '.md', '.doc', '.docx']
 
 
