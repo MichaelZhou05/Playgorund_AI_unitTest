@@ -3,7 +3,7 @@ Flask API Routes (ROLE 2: The "API Router")
 Handles all HTTP endpoints and connects frontend to core services.
 """
 from flask import request, render_template, jsonify, current_app as app
-from .services import firestore_service, rag_service, kg_service, canvas_service, gcs_service, gemini_service
+from .services import firestore_service, rag_service, kg_service, canvas_service, gcs_service, gemini_service, analytics_logging_service
 import os
 import logging
 import shutil
@@ -176,6 +176,14 @@ def chat():
     answer, sources  = gemini_service.generate_answer_with_context(
         query=query,
         corpus_id=corpus_id,
+    )
+
+    logger.info(f"Logging chat query for course {course_id}: {query[:50]}...")
+    analytics_logging_service.log_chat_query(
+        course_id=course_id,
+        query_text=query,
+        answer_text=answer,
+        sources=sources
     )
 
     return jsonify({
