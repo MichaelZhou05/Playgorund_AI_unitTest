@@ -95,8 +95,10 @@ def test_initialize_course(course_id: str, topics: str):
         logger.info("\n" + "="*70)
         logger.info("Step 5: Building knowledge graph...")
         logger.info("="*70)
+        # Split topics string into a list (comma-separated, for consistency with routes.py)
+        topic_list = topics.split(",")
         kg_nodes, kg_edges, kg_data = kg_service.build_knowledge_graph(
-            topic_list=topics,
+            topic_list=topic_list,
             corpus_id=corpus_id,
             files=files
         )
