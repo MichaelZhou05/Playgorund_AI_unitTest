@@ -117,7 +117,6 @@ def finalize_course_doc(course_id: str, data: dict) -> None:
 
 if __name__ == "__main__":
     # Test Firestore credentials and connection
-    import sys
     from dotenv import load_dotenv
     
     print("="*70)
