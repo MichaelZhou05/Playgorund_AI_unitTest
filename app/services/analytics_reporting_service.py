@@ -38,28 +38,114 @@ logger = logging.getLogger(__name__)
 # MAIN ANALYTICS PIPELINE
 # ============================================================================
 
-def run_daily_analytics(course_id: str, n_clusters: int = 5) -> dict:
+def determine_optimal_clusters(vectors, max_clusters: int = 10) -> int:
+    """
+    Uses the elbow method to determine the optimal number of clusters.
+    
+    The elbow method calculates inertia (sum of squared distances to cluster centers)
+    for different values of k and finds the "elbow point" where adding more clusters
+    provides diminishing returns.
+    
+    Args:
+        vectors: Numpy array of vectors
+        max_clusters: Maximum number of clusters to test (default: 10)
+        
+    Returns:
+        Optimal number of clusters
+        
+    Example:
+        optimal_k = determine_optimal_clusters(vectors, max_clusters=10)
+        # Returns: 5 (if that's the elbow point)
+    """
+    try:
+        from sklearn.cluster import MiniBatchKMeans
+        import numpy as np
+        
+        n_samples = len(vectors)
+        
+        # Can't have more clusters than samples
+        max_k = min(max_clusters, n_samples - 1)
+        
+        # Need at least 2 clusters for elbow method
+        if max_k < 2:
+            logger.warning(f"Not enough samples ({n_samples}) for elbow method, using k=1")
+            return 1
+        
+        logger.info(f"Running elbow method to determine optimal clusters (testing k=1 to k={max_k})")
+        
+        inertias = []
+        k_values = range(1, max_k + 1)
+        
+        # Calculate inertia for each k
+        for k in k_values:
+            kmeans = MiniBatchKMeans(n_clusters=k, random_state=42, batch_size=100)
+            kmeans.fit(vectors)
+            inertias.append(kmeans.inertia_)
+            logger.info(f"  k={k}: inertia={kmeans.inertia_:.2f}")
+        
+        # Find the elbow point using the "elbow" heuristic
+        # Calculate the rate of change in inertia
+        if len(inertias) < 3:
+            optimal_k = len(inertias)
+        else:
+            # Calculate second derivative (rate of change of rate of change)
+            # The elbow is where the second derivative is maximized
+            inertias_array = np.array(inertias)
+            
+            # Normalize inertias to 0-1 scale for better comparison
+            inertias_normalized = (inertias_array - inertias_array.min()) / (inertias_array.max() - inertias_array.min() + 1e-10)
+            
+            # Calculate rate of decrease
+            differences = np.diff(inertias_normalized)
+            
+            # Calculate second derivative (change in rate of decrease)
+            second_diff = np.diff(differences)
+            
+            # The elbow is where the second derivative is largest (most positive)
+            # This indicates the point where adding clusters stops being as beneficial
+            elbow_index = np.argmax(second_diff) + 2  # +2 because we lost 2 elements in diff operations
+            
+            optimal_k = k_values[elbow_index]
+        
+        logger.info(f"Elbow method suggests optimal k={optimal_k}")
+        
+        return optimal_k
+        
+    except Exception as e:
+        logger.error(f"Failed to determine optimal clusters: {e}", exc_info=True)
+        # Fallback to a reasonable default
+        return min(5, len(vectors) // 10)  # Use 5 or 10% of samples, whichever is smaller
+
+
+def run_daily_analytics(course_id: str, n_clusters: int = None, auto_detect_clusters: bool = True) -> dict:
     """
     Runs the complete analytics pipeline for a course.
     
     This is the main analytics function that:
     1. Fetches all chat query vectors from Firestore
-    2. Clusters them using MiniBatchKMeans
-    3. Labels each cluster using AI
-    4. Generates a comprehensive report
-    5. Saves the report to Firestore
+    2. Determines optimal number of clusters (if auto_detect_clusters=True)
+    3. Clusters them using MiniBatchKMeans
+    4. Labels each cluster using AI
+    5. Generates a comprehensive report
+    6. Saves the report to Firestore
     
     This should be run periodically (e.g., daily) or on-demand by professors.
     
     Args:
         course_id: The Canvas course ID
-        n_clusters: Number of clusters to create (default: 5)
+        n_clusters: Number of clusters to create (optional if auto_detect_clusters=True)
+        auto_detect_clusters: Use elbow method to automatically determine optimal k (default: True)
         
     Returns:
         Dictionary containing the analytics report
         
     Example:
+        # Auto-detect optimal clusters
         report = run_daily_analytics("12345")
+        
+        # Or specify exact number
+        report = run_daily_analytics("12345", n_clusters=5, auto_detect_clusters=False)
+        
         # Returns: {
         #     'clusters': {
         #         'Getting Started Questions': 15,
@@ -67,6 +153,7 @@ def run_daily_analytics(course_id: str, n_clusters: int = 5) -> dict:
         #         ...
         #     },
         #     'total_queries': 50,
+        #     'optimal_clusters': 5,
         #     'generated_at': '2025-11-08T10:30:00Z'
         # }
     """
@@ -90,6 +177,15 @@ def run_daily_analytics(course_id: str, n_clusters: int = 5) -> dict:
         # Step 2: Extract vectors and doc IDs
         logger.info("Extracting vectors for clustering...")
         vectors, doc_ids = _extract_vectors(events)
+        
+        # Step 2.5: Determine optimal number of clusters if needed
+        if auto_detect_clusters:
+            logger.info("Auto-detecting optimal number of clusters using elbow method...")
+            n_clusters = determine_optimal_clusters(vectors, max_clusters=15)
+        elif n_clusters is None:
+            # Default to 5 if not specified and auto-detect is off
+            n_clusters = 5
+            logger.info(f"Using default n_clusters={n_clusters}")
         
         # Step 3: Cluster the vectors
         logger.info(f"Clustering into {n_clusters} groups...")
@@ -129,6 +225,8 @@ def run_daily_analytics(course_id: str, n_clusters: int = 5) -> dict:
             'course_id': course_id,
             'total_queries': len(events),
             'num_clusters': len(clusters),
+            'optimal_clusters': n_clusters,  # Include the k value used
+            'auto_detected': auto_detect_clusters,  # Flag whether it was auto-detected
             'clusters': clusters,
             'generated_at': datetime.utcnow().isoformat()
         }
@@ -274,7 +372,7 @@ def _label_cluster(query_texts: List[str]) -> str:
 
 if __name__ == "__main__":
     """
-    Test the analytics reporting functions.
+    Test the analytics reporting functions with real data.
     """
     from dotenv import load_dotenv
     
@@ -284,51 +382,85 @@ if __name__ == "__main__":
     print("ANALYTICS REPORTING SERVICE TEST")
     print("="*70)
     
-    TEST_COURSE_ID = "test_course_123"
+    # Use the actual course ID with 50 queries we just logged
+    TEST_COURSE_ID = "13299557"
     
-    print(f"\nTest Course ID: {TEST_COURSE_ID}")
+    print(f"\nCourse ID: {TEST_COURSE_ID}")
     
-    # Test 1: Run analytics
+    # Test 1: Run analytics with real data
     print("\n" + "="*70)
-    print("Test 1: Running daily analytics")
+    print("Test 1: Running daily analytics on real data")
     print("="*70)
     
     try:
-        report = run_daily_analytics(TEST_COURSE_ID, n_clusters=3)
-        print(f"✓ Analytics completed")
-        print(f"  Status: {report.get('status')}")
-        print(f"  Total Queries: {report.get('total_queries')}")
+        # Run analytics with auto-detection (elbow method)
+        print("\nUsing elbow method to auto-detect optimal clusters...")
+        report = run_daily_analytics(TEST_COURSE_ID, auto_detect_clusters=True)
+        
+        print(f"\n✓ Analytics completed!")
+        print(f"\n{'='*70}")
+        print(f"ANALYTICS REPORT SUMMARY")
+        print(f"{'='*70}")
+        print(f"Status: {report.get('status')}")
+        print(f"Total Queries: {report.get('total_queries')}")
+        print(f"Optimal Clusters (auto-detected): {report.get('optimal_clusters')}")
+        print(f"Auto-detected: {report.get('auto_detected')}")
+        print(f"Generated At: {report.get('generated_at')}")
         
         if report.get('status') == 'complete':
-            print(f"  Number of Clusters: {report.get('num_clusters')}")
-            print(f"\n  Cluster Breakdown:")
-            for label, info in report.get('clusters', {}).items():
-                print(f"    - {label}: {info['count']} queries")
+            print(f"Number of Clusters: {report.get('num_clusters')}")
+            print(f"\n{'='*70}")
+            print(f"CLUSTER BREAKDOWN")
+            print(f"{'='*70}")
+            
+            clusters = report.get('clusters', {})
+            
+            # Sort clusters by count (descending)
+            sorted_clusters = sorted(clusters.items(), key=lambda x: x[1]['count'], reverse=True)
+            
+            for i, (label, info) in enumerate(sorted_clusters, 1):
+                print(f"\nCluster {i}: {label}")
+                print(f"  Count: {info['count']} queries")
+                print(f"  Sample queries:")
+                for j, query in enumerate(info.get('sample_queries', []), 1):
+                    # Truncate long queries for display
+                    display_query = query[:80] + "..." if len(query) > 80 else query
+                    print(f"    {j}. {display_query}")
+        else:
+            print(f"\n⚠ Status: {report.get('status')}")
+            print(f"Message: {report.get('message', 'No message')}")
+            
     except Exception as e:
-        print(f"✗ Failed to run analytics: {e}")
+        print(f"\n✗ Failed to run analytics: {e}")
         import traceback
         traceback.print_exc()
     
-    # Test 2: Get report
+    # Test 2: Retrieve the saved report
     print("\n" + "="*70)
-    print("Test 2: Retrieving analytics report")
+    print("Test 2: Retrieving saved analytics report")
     print("="*70)
     
     try:
         report = get_analytics_report(TEST_COURSE_ID)
         if report:
-            print(f"✓ Report retrieved")
+            print(f"✓ Report retrieved successfully")
             print(f"  Status: {report.get('status')}")
             print(f"  Generated at: {report.get('generated_at')}")
             if report.get('clusters'):
-                print(f"  Clusters found: {len(report.get('clusters'))}")
+                print(f"  Clusters: {len(report.get('clusters'))}")
+                print(f"  Total queries: {report.get('total_queries')}")
         else:
-            print("⚠ No report found")
+            print("⚠ No report found in Firestore")
     except Exception as e:
         print(f"✗ Failed to retrieve report: {e}")
+        import traceback
+        traceback.print_exc()
     
     print("\n" + "="*70)
-    print("✓ Analytics reporting service ready!")
-    print("\nNote: Currently using placeholder vectors.")
-    print("Next step: Implement embeddings in gemini_service")
+    print("✓ Analytics reporting service test complete!")
+    print("="*70)
+    print("\nThe report has been:")
+    print("  1. Generated with clustering and AI labeling")
+    print("  2. Saved to Firestore (analytics_reports collection)")
+    print("  3. Ready to be retrieved via API")
     print("="*70)
