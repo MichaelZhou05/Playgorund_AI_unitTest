@@ -1439,4 +1439,10 @@ function setupChatToggle() {
 }
 
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', initializeUI);
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.IS_EDITOR) {
+        console.log("Editor mode — skipping initializeUI()");
+        return;
+    }
+    initializeUI();
+});
