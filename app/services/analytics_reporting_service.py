@@ -308,7 +308,6 @@ def _perform_clustering(vectors, n_clusters: int = 5):
     Returns:
         Cluster labels array
     """
-    # TODO: Install sklearn: pip install scikit-learn
     try:
         from sklearn.cluster import MiniBatchKMeans
         
