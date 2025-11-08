@@ -211,7 +211,7 @@ if __name__ == "__main__":
             'size': 153935,
             'created_at': '2025-11-07T05:39:33Z',
             'updated_at': '2025-11-07T05:39:33Z',
-            'local_path': 'C:\\Users\\tm419\\Documents\\Repositories\\Playground\\app\\data\\courses\\13299557\\Lec 1.pdf',
+            'local_path': os.path.join(root_dir, 'app', 'data', 'courses', '13299557', 'Lec 1.pdf'),
             'gcs_uri': 'gs://gen-lang-client-0696883642-canvas-files/courses/13299557/Lec 1.pdf'
         }
 
