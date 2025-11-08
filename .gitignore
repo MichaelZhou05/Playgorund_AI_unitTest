@@ -29,6 +29,7 @@ instance/
 
 # GCP Credentials
 service-account.json
+Google Keys
 
 # Environment variables
 .env
