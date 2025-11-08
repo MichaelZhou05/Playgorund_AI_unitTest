@@ -7,8 +7,6 @@ from vertexai.preview import rag
 from vertexai.preview.rag.utils.resources import RagCorpus, RagFile
 from vertexai.generative_models import GenerativeModel
 import os
-import io
-import requests
 import logging
 from typing import List, Tuple, Dict
 
@@ -16,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize Vertex AI with environment variables
 project_id = os.environ.get('GOOGLE_CLOUD_PROJECT')
-location = os.environ.get('GOOGLE_CLOUD_LOCATION', 'us-central1')
+location = os.environ.get('GOOGLE_CLOUD_LOCATION')
 
 if project_id:
     vertexai.init(project=project_id, location=location)
@@ -25,19 +23,30 @@ else:
     logger.warning("GOOGLE_CLOUD_PROJECT not set - Vertex AI not initialized")
 
 
-def create_and_provision_corpus(files: list, canvas_token: str) -> str:
+def create_and_provision_corpus(files: List[Dict], corpus_name_suffix: str = "") -> str:
     """
-    Creates a new RAG corpus and uploads all course files.
+    Creates a new RAG corpus and uploads files from Google Cloud Storage.
     
     Args:
-        files: List of file objects from Canvas API (with keys: id, display_name, url, etc.)
-        canvas_token: Canvas API token for downloading files
+        files: List of file objects from Canvas service (each with 'gcs_uri' key)
+               e.g., [{'id': '456', 'display_name': 'file.pdf', 'gcs_uri': 'gs://bucket/courses/123/file.pdf'}, ...]
+        corpus_name_suffix: Optional suffix for corpus display name
         
     Returns:
         The corpus resource name (string) e.g., "projects/.../ragCorpora/..."
         
     Raises:
         Exception: If corpus creation or file upload fails
+        
+    Example:
+        # Step 1: Get files from Canvas (downloads locally)
+        files, _ = canvas_service.get_course_files(course_id, token)
+        
+        # Step 2: Upload to GCS
+        files = gcs_service.upload_course_files(files, course_id)
+        
+        # Step 3: Create RAG corpus from GCS files
+        corpus_name = create_and_provision_corpus(files, f"Course {course_id}")
     """
     if not project_id:
         raise ValueError("GOOGLE_CLOUD_PROJECT environment variable not set")
@@ -45,52 +54,53 @@ def create_and_provision_corpus(files: list, canvas_token: str) -> str:
     try:
         # Create a new RAG corpus
         logger.info("Creating new RAG corpus...")
-        corpus = rag.create_corpus(
-            display_name=f"Canvas Course Corpus - {len(files)} files"
-        )
+        corpus_display_name = f"Canvas Course Corpus - {len(files)} files"
+        if corpus_name_suffix:
+            corpus_display_name += f" ({corpus_name_suffix})"
+        
+        corpus = rag.create_corpus(display_name=corpus_display_name)
         corpus_name = corpus.name
         logger.info(f"Created corpus: {corpus_name}")
         
-        # Upload each file to the corpus
+        # Upload each file to the corpus from GCS
+        upload_count = 0
         for file in files:
             try:
+                gcs_uri = file.get('gcs_uri')
                 file_id = file.get('id')
-                display_name = file.get('display_name', f"file_{file_id}")
-                download_url = file.get('url')
-                html_url = file.get('html_url', '')
+                display_name = file.get('display_name', 'unknown')
                 
-                logger.info(f"Uploading file: {display_name} (ID: {file_id})")
+                # Skip files that weren't uploaded to GCS
+                if not gcs_uri:
+                    logger.warning(f"No GCS URI for file: {display_name} (ID: {file_id}), skipping")
+                    continue
                 
-                # Download file content from Canvas
-                headers = {'Authorization': f'Bearer {canvas_token}'}
-                response = requests.get(download_url, headers=headers, timeout=30)
-                response.raise_for_status()
+                # Validate GCS URI format
+                if not gcs_uri.startswith('gs://'):
+                    logger.warning(f"Invalid GCS URI for file {display_name}: {gcs_uri}, skipping")
+                    continue
                 
-                # Create in-memory file object
-                file_bytes = io.BytesIO(response.content)
-                file_bytes.name = display_name  # Set name attribute for upload
+                logger.info(f"Importing file from GCS: {display_name} (ID: {file_id})")
+                logger.info(f"  GCS URI: {gcs_uri}")
                 
-                # Import file to RAG corpus with metadata
+                # Import file to RAG corpus from GCS
+                # Note: Vertex AI RAG automatically indexes the content
                 rag.import_files(
                     corpus_name=corpus_name,
-                    paths=[file_bytes],
+                    paths=[gcs_uri],  # Use GCS URI instead of local path
                     chunk_size=512,  # Optimal chunk size for retrieval
-                    chunk_overlap=100,  # Overlap for context continuity
-                    metadata={
-                        'file_id': str(file_id),
-                        'display_name': display_name,
-                        'canvas_url': html_url
-                    }
+                    chunk_overlap=100  # Overlap for context continuity
                 )
                 
-                logger.info(f"Successfully uploaded: {display_name}")
+                upload_count += 1
+                logger.info(f"✅ Successfully imported: {display_name}")
                 
             except Exception as e:
-                logger.error(f"Failed to upload file {file.get('display_name')}: {str(e)}")
+                logger.error(f"Failed to import file {file.get('display_name')}: {str(e)}")
                 # Continue with other files even if one fails
                 continue
         
-        logger.info(f"Corpus provisioning complete: {corpus_name}")
+        logger.info(f"Corpus provisioning complete: {corpus_name} ({upload_count}/{len(files)} files uploaded)")
         return corpus_name
         
     except Exception as e:
@@ -134,13 +144,17 @@ def query_rag_corpus(corpus_id: str, query: str) -> Tuple[str, List[str]]:
         contexts = response.contexts.contexts
         context_texts = [context.text for context in contexts]
         
-        # Extract unique source files
+        # Extract unique source files from source URI
+        # Vertex AI RAG stores file names in the source attribute
         citations = []
         for context in contexts:
-            if hasattr(context, 'source_metadata') and context.source_metadata:
-                display_name = context.source_metadata.get('display_name')
-                if display_name and display_name not in citations:
-                    citations.append(display_name)
+            # Try to extract filename from source
+            if hasattr(context, 'source') and context.source:
+                # Source might be in format like "gs://bucket/corpus/file.pdf"
+                source_path = context.source.uri if hasattr(context.source, 'uri') else str(context.source)
+                filename = source_path.split('/')[-1] if '/' in source_path else source_path
+                if filename and filename not in citations:
+                    citations.append(filename)
         
         logger.info(f"Retrieved {len(contexts)} context chunks from {len(citations)} sources")
         
@@ -227,13 +241,15 @@ def query_rag_with_history(corpus_id: str, history: List[Dict[str, str]]) -> Tup
         contexts = response.contexts.contexts
         context_texts = [context.text for context in contexts]
         
-        # Extract unique source files
+        # Extract unique source files from source URI
         citations = []
         for context in contexts:
-            if hasattr(context, 'source_metadata') and context.source_metadata:
-                display_name = context.source_metadata.get('display_name')
-                if display_name and display_name not in citations:
-                    citations.append(display_name)
+            # Try to extract filename from source
+            if hasattr(context, 'source') and context.source:
+                source_path = context.source.uri if hasattr(context.source, 'uri') else str(context.source)
+                filename = source_path.split('/')[-1] if '/' in source_path else source_path
+                if filename and filename not in citations:
+                    citations.append(filename)
         
         logger.info(f"Retrieved {len(contexts)} context chunks from {len(citations)} sources")
         
@@ -336,3 +352,47 @@ Questions:"""
     except Exception as e:
         logger.error(f"Failed to generate suggested questions: {str(e)}")
         raise
+
+if __name__ == "__main__":
+    # Load environment variables from root .env file
+    from dotenv import load_dotenv
+    import sys
+    
+    # Get the root directory (2 levels up from this file)
+    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    env_path = os.path.join(root_dir, '.env')
+    
+    # Load environment variables from root .env
+    load_dotenv(env_path)
+
+    project_id = os.environ.get('GOOGLE_CLOUD_PROJECT')
+    location = os.environ.get('GOOGLE_CLOUD_LOCATION')
+
+    print(f"GOOGLE_CLOUD_LOCATION: {location}")
+
+    vertexai.init(project=project_id, location=location)
+
+    # Example usage - test with GCS URI
+    try:
+        mock_file = {
+            'id': '319580865',
+            'display_name': 'Lec 1.pdf',
+            'filename': 'Lec+1.pdf',
+            'url': 'https://canvas.instructure.com/files/319580865/download',
+            'gcs_uri': 'gs://your-bucket-name/courses/13299557/Lec 1.pdf'  # GCS URI required!
+        }
+
+        print("\n⚠️  Note: This test requires the file to exist in GCS first!")
+        print(f"Expected GCS URI: {mock_file['gcs_uri']}")
+        print("\nTo upload files to GCS, use:")
+        print("  from app.services import gcs_service")
+        print("  files = gcs_service.upload_course_files(files, course_id)")
+        
+        # Uncomment to test (requires file in GCS):
+        # corpus_name = create_and_provision_corpus([mock_file], "Test Corpus")
+        # print(f"\n✅ Corpus created: {corpus_name}")
+        
+    except Exception as e:
+        print(f"\nError: {e}")
+        import traceback
+        traceback.print_exc()
