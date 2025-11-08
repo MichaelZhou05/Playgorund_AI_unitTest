@@ -218,7 +218,8 @@ if __name__ == "__main__":
         print(f"Expected GCS URI: {mock_file['gcs_uri']}")
         
         # Test corpus creation
-        corpus_name = "projects/449848198411/locations/us-east1/ragCorpora/6341068275337658368" #create_and_provision_corpus([mock_file], "Test Corpus")
+        # Create and provision a new corpus for testing. This may take some time and incur costs.
+        corpus_name = create_and_provision_corpus([mock_file], "Test Corpus")
         print(f"\n✅ Corpus created: {corpus_name}")
 
         # Test context retrieval (no answer generation)
