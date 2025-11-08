@@ -4,6 +4,10 @@ This module creates and configures the Flask app instance.
 """
 from flask import Flask
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 def create_app():
@@ -12,12 +16,14 @@ def create_app():
     Creates and configures the Flask application.
     """
     app = Flask(__name__)
-    
-    # Configuration
+
+    # Configuration from environment variables
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-    
+    app.config['ENV'] = os.environ.get('FLASK_ENV', 'production')
+    app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+
     # Register routes
     with app.app_context():
         from . import routes
-        
+
     return app

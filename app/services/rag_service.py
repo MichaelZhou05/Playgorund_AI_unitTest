@@ -5,11 +5,18 @@ Handles all Vertex AI RAG Engine operations.
 import vertexai
 from vertexai.preview import rag
 from vertexai.generative_models import GenerativeModel
+import os
 
+# Initialize Vertex AI with environment variables
+project_id = os.environ.get('GOOGLE_CLOUD_PROJECT')
+location = os.environ.get('GOOGLE_CLOUD_LOCATION', 'us-central1')
 
-# Initialize Vertex AI
-# TODO: Configure project and location
-# vertexai.init(project="your-project-id", location="us-central1")
+if project_id:
+    vertexai.init(project=project_id, location=location)
+else:
+    # TODO: Remove this fallback once environment is properly configured
+    # vertexai.init(project="your-project-id", location="us-central1")
+    pass
 
 
 def create_and_provision_corpus(files: list) -> str:
