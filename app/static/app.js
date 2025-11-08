@@ -39,9 +39,117 @@ function setupInitPage() {
     
     if (generateNowBtn) {
         generateNowBtn.addEventListener('click', () => {
-            startTopicGeneration();
+            startAutoGeneration();
         });
     }
+}
+
+// Start the automatic course generation pipeline
+async function startAutoGeneration() {
+    // Hide landing, show loading
+    document.getElementById('landing-screen').style.display = 'none';
+    document.getElementById('init-loading').style.display = 'block';
+    
+        try {
+            const response = await fetch('/api/initialize-course', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                course_id: COURSE_ID
+                // No topics - backend will auto-extract
+            })
+            });
+            
+            const result = await response.json();
+            
+        if (!response.ok) {
+            throw new Error(result.error || 'Generation failed');
+        }
+        
+        // Hide loading, show editor with generated KG
+        document.getElementById('init-loading').style.display = 'none';
+        document.getElementById('init-editor').style.display = 'block';
+        
+        // Convert KG nodes to topics format for editing
+        const topicsData = convertGraphToTopics(result);
+        renderTopicEditor(topicsData);
+        setupTopicEditorHandlers();
+        
+    } catch (error) {
+        console.error('Auto-generation failed:', error);
+        showManualFallback(error.message);
+    }
+}
+
+// Convert knowledge graph API response to topics editor format
+function convertGraphToTopics(apiResponse) {
+    const nodes = apiResponse.kg_nodes || [];
+    const data = apiResponse.kg_data || {};
+    
+    const topicsData = [];
+    
+    // Parse JSON strings if needed
+    const parsedNodes = typeof nodes === 'string' ? JSON.parse(nodes) : nodes;
+    const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+    
+    // Filter for topic nodes only (not file nodes)
+    const topicNodes = parsedNodes.filter(node => node.group === 'topic');
+    
+    // Convert to topics editor format
+    for (const node of topicNodes) {
+        const topicId = node.id; // e.g., "topic_1"
+        const topicInfo = parsedData[topicId] || {};
+        
+        topicsData.push({
+            topic: node.label || 'Untitled Topic',
+            summary: topicInfo.summary || 'No summary available.'
+        });
+    }
+    
+    console.log('Converted topics data:', topicsData);
+    return topicsData;
+}
+
+// Show manual fallback UI when auto-generation fails
+function showManualFallback(errorMessage) {
+    const loadingDiv = document.getElementById('init-loading');
+    const editorDiv = document.getElementById('init-editor');
+    
+    // Show the Airbnb-style error page
+    loadingDiv.innerHTML = `
+        <div class="generation-failed">
+            <div class="error-illustration">
+                <div class="sad-face">
+                    <div class="face-circle">
+                        <div class="eye left-eye"></div>
+                        <div class="eye right-eye"></div>
+                        <div class="mouth"></div>
+                    </div>
+                    <div class="sparkle sparkle-1">✨</div>
+                    <div class="sparkle sparkle-2">⚡</div>
+                    <div class="sparkle sparkle-3">💫</div>
+                </div>
+            </div>
+            <h2 class="error-title">Oops!</h2>
+            <p class="error-message">We couldn't auto-generate topics: ${escapeHtml(errorMessage)}</p>
+            <p class="error-hint">But don't worry! You can still create an amazing course by adding topics manually.</p>
+            <button id="start-manual-btn" class="manual-btn">
+                <span class="btn-icon">✏️</span>
+                <span class="btn-text">Create Topics Manually</span>
+            </button>
+        </div>
+    `;
+    
+    // Add event listener to the manual button
+    document.getElementById('start-manual-btn').addEventListener('click', () => {
+        loadingDiv.style.display = 'none';
+        editorDiv.style.display = 'block';
+        renderTopicEditor([{ 
+            topic: 'My First Topic', 
+            summary: 'Click to edit this topic and add your course content.' 
+        }]);
+        setupTopicEditorHandlers();
+    });
 }
 
 // Start the topic generation process
@@ -62,7 +170,7 @@ async function loadSuggestedTopics() {
     const editorDiv = document.getElementById('init-editor');
     
     try {
-        const response = await fetch('/api/generate-suggested-topics', {
+        const response = await fetch(`/api/get-graph?course_id=${COURSE_ID}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ course_id: COURSE_ID })
@@ -200,10 +308,9 @@ function renderTopicEditor(topicsData) {
     // Store topics data globally for easy access
     window.topicsData = topicsData;
     
-    // Calculate sizes for each node (now returns {width, height})
-    const nodeSizes = topicsData.map(item => 
-        calculateNodeSize(item.topic, item.summary)
-    );
+    // Fixed compact size for all nodes
+    const compactSize = { width: 180, height: 80 };
+    const nodeSizes = topicsData.map(() => compactSize);
     window.nodeSizes = nodeSizes;
     
     // Calculate positions for nodes (distributed layout)
@@ -211,17 +318,22 @@ function renderTopicEditor(topicsData) {
     
     topicsData.forEach((item, index) => {
         const node = document.createElement('div');
-        node.className = `topic-node color-${(index % 6) + 1}`;
+        node.className = `topic-node color-${(index % 6) + 1} compact`;
         node.dataset.index = index;
         
-        // Set dynamic size (width and height for oval)
-        const size = nodeSizes[index];
-        node.style.width = size.width + 'px';
-        node.style.height = size.height + 'px';
+        // Set compact size
+        node.style.width = compactSize.width + 'px';
+        node.style.height = compactSize.height + 'px';
         
         // Set position
         node.style.left = positions[index].x + 'px';
         node.style.top = positions[index].y + 'px';
+        
+        // Store original position and size
+        node.dataset.originalLeft = positions[index].x;
+        node.dataset.originalTop = positions[index].y;
+        node.dataset.originalWidth = compactSize.width;
+        node.dataset.originalHeight = compactSize.height;
         
         // Create delete button
         const deleteBtn = document.createElement('button');
@@ -229,7 +341,7 @@ function renderTopicEditor(topicsData) {
         deleteBtn.dataset.index = index;
         deleteBtn.innerHTML = '&times;';
         
-        // Create editable title
+        // Create editable title (always visible)
         const title = document.createElement('div');
         title.className = 'node-title';
         title.contentEditable = 'true';
@@ -237,25 +349,31 @@ function renderTopicEditor(topicsData) {
         title.dataset.index = index;
         title.dataset.field = 'topic';
         
-        // Create editable summary
+        // Create editable summary (hidden in compact mode)
         const summary = document.createElement('div');
         summary.className = 'node-summary';
         summary.contentEditable = 'true';
         summary.textContent = item.summary;
         summary.dataset.index = index;
         summary.dataset.field = 'summary';
+        summary.style.display = 'none'; // Hidden by default
         
         // Add elements to node
         node.appendChild(deleteBtn);
         node.appendChild(title);
         node.appendChild(summary);
         
-        // Setup inline editing handlers
-        setupInlineEditHandlers(title, index, 'topic');
-        setupInlineEditHandlers(summary, index, 'summary');
+        // Setup click-to-expand and inline editing handlers
+        setupNodeExpandHandlers(node, title, summary, index);
         
         canvas.appendChild(node);
     });
+    
+    // Setup canvas click to collapse expanded nodes (click outside)
+    setupCanvasClickToCollapse(canvas);
+    
+    // Setup escape key to collapse expanded nodes
+    setupEscapeKeyHandler();
 }
 
 // Calculate positions for nodes in an attractive layout
@@ -312,56 +430,199 @@ function calculateNodePositions(count, nodeSizes = null) {
     return positions;
 }
 
-// Setup inline editing handlers for a contentEditable element
-function setupInlineEditHandlers(element, index, field) {
-    const node = element.closest('.topic-node');
+// Setup node expand/collapse and editing handlers
+function setupNodeExpandHandlers(node, title, summary, index) {
+    let isExpanded = false;
     
-    // Prevent click from propagating to node
-    element.addEventListener('click', (e) => {
-        e.stopPropagation();
-    });
-    
-    // Focus event - zoom in and center the node
-    element.addEventListener('focus', () => {
-        zoomToNode(node);
-    });
-    
-    // Save on blur (when user clicks away)
-    element.addEventListener('blur', () => {
-        const newValue = element.textContent.trim();
-        if (newValue && window.topicsData[index]) {
-            window.topicsData[index][field] = newValue;
-            
-            // Recalculate and apply new size based on updated content
-            resizeNodeAfterEdit(node, index);
-        }
+    // Click on node (not on contentEditable areas) to expand
+    node.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent canvas click handler from firing
         
-        // Check if no other element in this node is focused
+        // Don't toggle if clicking on delete button or if already editing
+        if (e.target.closest('.node-delete-btn')) return;
+        if (e.target.contentEditable === 'true' && isExpanded) return;
+        
+        if (!isExpanded) {
+            // Collapse any other expanded nodes first
+            collapseAllNodes();
+            
+            expandNode(node, title, summary);
+            isExpanded = true;
+            
+            // Store reference to currently expanded node
+            window.currentExpandedNode = { node, title, summary, handlers: { setExpanded: (val) => { isExpanded = val; } } };
+        }
+    });
+    
+    // Handle focus on title
+    title.addEventListener('focus', () => {
+        if (!isExpanded) {
+            // Collapse any other expanded nodes first
+            collapseAllNodes();
+            
+            expandNode(node, title, summary);
+            isExpanded = true;
+            window.currentExpandedNode = { node, title, summary, handlers: { setExpanded: (val) => { isExpanded = val; } } };
+        }
+    });
+    
+    // Handle focus on summary
+    summary.addEventListener('focus', () => {
+        if (!isExpanded) {
+            // Collapse any other expanded nodes first
+            collapseAllNodes();
+            
+            expandNode(node, title, summary);
+            isExpanded = true;
+            window.currentExpandedNode = { node, title, summary, handlers: { setExpanded: (val) => { isExpanded = val; } } };
+        }
+    });
+    
+    // Save on blur - check if focus left the node entirely
+    const handleBlur = () => {
         setTimeout(() => {
             const activeElement = document.activeElement;
-            const isInSameNode = activeElement && activeElement.closest('.topic-node') === node;
-            if (!isInSameNode) {
-                zoomOutNode(node);
+            const isStillInNode = activeElement && activeElement.closest('.topic-node') === node;
+            
+            if (!isStillInNode && isExpanded) {
+                // Save changes
+                const newTitle = title.textContent.trim();
+                const newSummary = summary.textContent.trim();
+                
+                if (newTitle) {
+                    window.topicsData[index].topic = newTitle;
+                    window.topicsData[index].summary = newSummary;
+                }
+                
+                // Collapse node
+                collapseNode(node, summary);
+                isExpanded = false;
             }
         }, 10);
-    });
+    };
     
-    // Prevent Enter key from creating new lines in title
-    if (field === 'topic') {
-        element.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                element.blur(); // Save and exit editing
-            }
-        });
-    }
+    title.addEventListener('blur', handleBlur);
+    summary.addEventListener('blur', handleBlur);
     
-    // Allow Enter in summary but save on Escape
-    element.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            element.blur(); // Save and exit editing
+    // Keyboard shortcuts
+    title.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            summary.focus();
+        } else if (e.key === 'Escape') {
+            title.blur();
         }
     });
+    
+    summary.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            summary.blur();
+        }
+    });
+}
+
+// Expand node for editing
+function expandNode(node, title, summary) {
+    const canvas = document.getElementById('topic-canvas');
+    
+    // Calculate expanded size - fixed dimensions for consistent layout
+    const viewportWidth = window.innerWidth;
+    const padding = 80; // Padding from edges
+    
+    const expandedWidth = Math.min(viewportWidth - padding * 2, 1200); // Max 1200px width
+    const expandedHeight = 600; // Fixed height for consistent summary area
+    
+    // Add expanded class
+    node.classList.remove('compact');
+    node.classList.add('expanded');
+    
+    // Set expanded size with smooth transition
+    node.style.width = expandedWidth + 'px';
+    node.style.height = expandedHeight + 'px';
+    
+    // Show summary
+    summary.style.display = 'block';
+    
+    // Dim other nodes
+    const allNodes = canvas.querySelectorAll('.topic-node');
+    allNodes.forEach(otherNode => {
+        if (otherNode !== node) {
+            otherNode.classList.add('dimmed');
+        }
+    });
+    
+    // Zoom to node and center it
+    zoomToNode(node);
+}
+
+// Collapse node back to compact view
+function collapseNode(node, summary) {
+    const canvas = document.getElementById('topic-canvas');
+    
+    // Remove expanded class, add compact
+    node.classList.remove('expanded');
+    node.classList.add('compact');
+    
+    // Restore compact size
+    node.style.width = node.dataset.originalWidth + 'px';
+    node.style.height = node.dataset.originalHeight + 'px';
+    
+    // Hide summary
+    summary.style.display = 'none';
+    
+    // Un-dim other nodes
+    const allNodes = canvas.querySelectorAll('.topic-node');
+    allNodes.forEach(otherNode => {
+        otherNode.classList.remove('dimmed');
+    });
+    
+    // Zoom out
+    zoomOutNode(node);
+}
+
+// Collapse all currently expanded nodes
+function collapseAllNodes() {
+    if (window.currentExpandedNode) {
+        const { node, summary, handlers } = window.currentExpandedNode;
+        collapseNode(node, summary);
+        handlers.setExpanded(false);
+        window.currentExpandedNode = null;
+    }
+}
+
+// Setup canvas click handler to collapse nodes when clicking outside
+function setupCanvasClickToCollapse(canvas) {
+    // Remove any existing handler to avoid duplicates
+    if (window.canvasClickHandler) {
+        canvas.removeEventListener('click', window.canvasClickHandler);
+    }
+    
+    // Create new handler
+    window.canvasClickHandler = (e) => {
+        // Only collapse if clicking directly on canvas (not on a node)
+        if (e.target === canvas) {
+            collapseAllNodes();
+        }
+    };
+    
+    canvas.addEventListener('click', window.canvasClickHandler);
+}
+
+// Setup escape key handler to collapse expanded nodes
+function setupEscapeKeyHandler() {
+    // Remove any existing handler to avoid duplicates
+    if (window.escapeKeyHandler) {
+        document.removeEventListener('keydown', window.escapeKeyHandler);
+    }
+    
+    // Create new handler
+    window.escapeKeyHandler = (e) => {
+        if (e.key === 'Escape') {
+            collapseAllNodes();
+        }
+    };
+    
+    document.addEventListener('keydown', window.escapeKeyHandler);
 }
 
 // Resize node after editing to fit content
@@ -606,49 +867,41 @@ async function submitTopicsData() {
         item.summary && item.summary.trim()
     );
     
+    console.log('Topics data:', topicsData);
+    console.log('Valid topics:', validTopics);
+    
     if (validTopics.length === 0) {
-        alert('Please add at least one topic with both a name and summary.');
+        alert('Please add at least one topic with both a name and summary before generating the course.');
         return;
     }
     
     // Disable button and show loading state
     generateBtn.disabled = true;
-    generateBtn.textContent = 'Generating...';
+    generateBtn.textContent = 'Finalizing...';
+    
+    console.log('Starting animation...');
     
     // Animate nodes spreading out and removing delete buttons
     await animateNodesForGeneration();
     
-        try {
-            const response = await fetch('/api/initialize-course', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                course_id: COURSE_ID, 
-                topics_data: validTopics 
-            })
-            });
-            
-            const result = await response.json();
-            
-        if (result.status === 'generating' || result.status === 'complete') {
-            // Hide the generate button
-            const generateAction = document.querySelector('.generate-action');
-            if (generateAction) {
-                generateAction.style.display = 'none';
-            }
-            
-            // Show chat interface
-            showChatInterface();
-        } else {
-            throw new Error('Unexpected response status');
-        }
-        
-        } catch (error) {
-        console.error('Course generation failed:', error);
-        alert('Failed to generate course. Please try again.');
-        generateBtn.disabled = false;
-        generateBtn.textContent = 'Generate Course';
+    console.log('Animation complete!');
+    
+    // Hide the generate action buttons
+    const generateAction = document.querySelector('.generate-action');
+    if (generateAction) {
+        generateAction.style.display = 'none';
     }
+    
+    // Reset button state
+    generateBtn.textContent = 'Generate Course';
+    generateBtn.disabled = false;
+    
+    console.log('About to show chat interface...');
+    
+    // Show chat interface
+    showChatInterface();
+    
+    console.log('Chat interface should be visible now!');
 }
 
 // Animate nodes spreading out and hide delete buttons
@@ -717,6 +970,56 @@ async function animateNodesForGeneration() {
 function calculateEvenlySpreadPositions(count) {
     const canvas = document.getElementById('topic-canvas');
     const canvasWidth = canvas.offsetWidth || 1200;
+    const canvasHeight = 600; // Fixed height for consistent spread
+    const padding = 80;
+    
+    // Use compact node size for final layout
+    const nodeSize = { width: 180, height: 80 };
+    
+    const positions = [];
+    
+    if (count === 1) {
+        // Single node - center it
+        positions.push({
+            x: (canvasWidth - nodeSize.width) / 2,
+            y: (canvasHeight - nodeSize.height) / 2
+        });
+    } else if (count <= 3) {
+        // 2-3 nodes - horizontal line
+        const spacing = (canvasWidth - padding * 2 - nodeSize.width) / (count - 1);
+        for (let i = 0; i < count; i++) {
+            positions.push({
+                x: padding + i * spacing,
+                y: (canvasHeight - nodeSize.height) / 2
+            });
+        }
+    } else {
+        // 4+ nodes - even grid distribution
+        const cols = Math.ceil(Math.sqrt(count * (canvasWidth / canvasHeight)));
+        const rows = Math.ceil(count / cols);
+        
+        const cellWidth = (canvasWidth - padding * 2) / cols;
+        const cellHeight = (canvasHeight - padding * 2) / rows;
+        
+        for (let i = 0; i < count; i++) {
+            const row = Math.floor(i / cols);
+            const col = i % cols;
+            
+            // Center within cell
+            const x = padding + col * cellWidth + (cellWidth - nodeSize.width) / 2;
+            const y = padding + row * cellHeight + (cellHeight - nodeSize.height) / 2;
+            
+            positions.push({ x, y });
+        }
+    }
+    
+    return positions;
+}
+
+// Old circular layout code for reference (keeping rest of function)
+function calculateEvenlySpreadPositions_OLD(count) {
+    const canvas = document.getElementById('topic-canvas');
+    const canvasWidth = canvas.offsetWidth || 1200;
     const canvasHeight = canvas.offsetHeight || 600;
     const padding = 60;
     
@@ -779,14 +1082,17 @@ async function setupAppPage() {
     // Load graph data
     await loadGraphData();
     
-    // Initialize Vis.js network
+    // Initialize graph visualization
     initializeGraph();
     
     // Setup chat interface
     setupChat();
     
-    // Setup file toggle
-    setupFileToggle();
+    // Setup chat toggle (collapse/expand)
+    setupChatToggleActive();
+    
+    // Setup edit button
+    setupEditButtonActive();
 }
 
 // Load graph data from API
@@ -805,48 +1111,190 @@ async function loadGraphData() {
     }
 }
 
-// Initialize the Vis.js graph visualization
+// Initialize the graph visualization for ACTIVE state
 function initializeGraph() {
     if (!graphData) return;
     
-    const container = document.getElementById('graph-network');
-    const data = {
-        nodes: new vis.DataSet(graphData.nodes),
-        edges: new vis.DataSet(graphData.edges)
-    };
+    const container = document.getElementById('graph-network-active');
     
-    const options = {
-        // TODO: Configure Vis.js options
-        // Set colors for topic vs file nodes
-        // Configure physics, layout, etc.
-    };
+    if (!container) {
+        console.warn('Graph container not found');
+        return;
+    }
     
-    network = new vis.Network(container, data, options);
+    // Convert graph data to topics format
+    const topicsData = [];
+    const topicNodes = graphData.nodes.filter(node => node.group === 'topic');
     
-    // Handle node clicks
-    network.on('click', (params) => {
-        if (params.nodes.length > 0) {
-            const nodeId = params.nodes[0];
-            showNodeDetails(nodeId);
-        }
+    for (const node of topicNodes) {
+        const topicId = node.id;
+        const topicInfo = graphData.data[topicId] || {};
+        
+        topicsData.push({
+            topic: node.label || 'Untitled Topic',
+            summary: topicInfo.summary || 'No summary available.'
+        });
+    }
+    
+    // Store globally for reference
+    window.topicsData = topicsData;
+    
+    // Create visual nodes (full-screen style)
+    container.innerHTML = '';
+    container.style.position = 'fixed';
+    container.style.top = '0';
+    container.style.left = '0';
+    container.style.width = '100vw';
+    container.style.height = '100vh';
+    container.style.backgroundColor = '#f5f5f5';
+    container.style.padding = '0';
+    container.style.margin = '0';
+    container.style.overflow = 'hidden';
+    
+    // Calculate positions for full viewport
+    const canvasWidth = window.innerWidth;
+    const canvasHeight = window.innerHeight;
+    
+    // Calculate node sizes
+    const nodeSizes = topicsData.map(item => calculateNodeSize(item.topic, item.summary, true));
+    window.nodeSizes = nodeSizes;
+    
+    const positions = calculatePositionsForContainer(topicsData.length, nodeSizes, canvasWidth, canvasHeight);
+    
+    // Render each node (read-only, no delete buttons)
+    topicsData.forEach((item, index) => {
+        const pos = positions[index];
+        const size = nodeSizes[index];
+        const colorClass = `color-${(index % 6) + 1}`;
+        
+        const nodeDiv = document.createElement('div');
+        nodeDiv.className = `topic-node ${colorClass}`;
+        nodeDiv.style.position = 'absolute';
+        nodeDiv.style.left = `${pos.x}px`;
+        nodeDiv.style.top = `${pos.y}px`;
+        nodeDiv.style.width = `${size.width}px`;
+        nodeDiv.style.height = `${size.height}px`;
+        nodeDiv.style.cursor = 'default';
+        
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'node-title';
+        titleDiv.textContent = item.topic;
+        titleDiv.contentEditable = 'false';
+        titleDiv.style.cursor = 'default';
+        
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = 'node-summary';
+        summaryDiv.textContent = item.summary;
+        summaryDiv.contentEditable = 'false';
+        summaryDiv.style.cursor = 'default';
+        
+        nodeDiv.appendChild(titleDiv);
+        nodeDiv.appendChild(summaryDiv);
+        
+        container.appendChild(nodeDiv);
+    });
+    
+    // Show chat interface
+    const chatInterface = document.getElementById('chat-interface-active');
+    if (chatInterface) {
+        chatInterface.style.display = 'block';
+    }
+}
+
+// Setup chat toggle for ACTIVE state
+function setupChatToggleActive() {
+    const chatInterface = document.getElementById('chat-interface-active');
+    const chatToggleBtn = document.getElementById('chat-toggle-btn-active');
+    const chatInput = document.getElementById('chat-input-active');
+    const chatInputContainer = document.getElementById('chat-input-container-active');
+    
+    if (!chatInterface || !chatToggleBtn) return;
+    
+    // Toggle button click
+    chatToggleBtn.addEventListener('click', () => {
+        chatInterface.classList.toggle('collapsed');
+    });
+    
+    // Expand when clicking on input area
+    if (chatInput) {
+        chatInput.addEventListener('focus', () => {
+            chatInterface.classList.remove('collapsed');
+        });
+    }
+    
+    // Also expand when clicking anywhere in the input container
+    if (chatInputContainer) {
+        chatInputContainer.addEventListener('click', () => {
+            chatInterface.classList.remove('collapsed');
+        });
+    }
+}
+
+// Setup edit button for ACTIVE state
+function setupEditButtonActive() {
+    const editBtn = document.getElementById('back-to-edit-btn-active');
+    
+    if (!editBtn) return;
+    
+    editBtn.addEventListener('click', () => {
+        // This would reload the page in NEEDS_INIT state to edit topics
+        // For now, show alert that editing is not available in production
+        alert('To edit topics, please re-initialize the course from Canvas.');
     });
 }
 
-// Show details for a clicked node
-function showNodeDetails(nodeId) {
-    const detailsDiv = document.getElementById('node-details');
+// Helper function to calculate node positions for any container
+function calculatePositionsForContainer(count, nodeSizes, containerWidth, containerHeight) {
+    const positions = [];
     
-    // TODO: Implement node details display
-    // If it's a topic node, show summary and sources
-    // If it's a file node, show link to file
+    if (!nodeSizes || nodeSizes.length === 0) {
+        // Fallback to default sizes
+        nodeSizes = Array(count).fill({width: 200, height: 150});
+    }
     
-    detailsDiv.innerHTML = `<p>Details for node: ${nodeId}</p>`;
+    if (count <= 4) {
+        // For small counts, use horizontal layout
+        const spacing = 40;
+        const totalWidth = nodeSizes.reduce((sum, size) => sum + size.width, 0) + (count - 1) * spacing;
+        let startX = (containerWidth - totalWidth) / 2;
+        const centerY = containerHeight / 2;
+        
+        for (let i = 0; i < count; i++) {
+            const nodeSize = nodeSizes[i];
+            positions.push({
+                x: startX,
+                y: centerY - nodeSize.height / 2
+            });
+            startX += nodeSize.width + spacing;
+        }
+    } else {
+        // For larger counts, use circular pattern
+        const centerX = containerWidth / 2;
+        const centerY = containerHeight / 2;
+        const radius = Math.min(containerWidth, containerHeight) * 0.35;
+        
+        for (let i = 0; i < count; i++) {
+            const nodeSize = nodeSizes[i];
+            const angle = (i * 2 * Math.PI) / count - Math.PI / 2;
+            positions.push({
+                x: centerX + radius * Math.cos(angle) - nodeSize.width / 2,
+                y: centerY + radius * Math.sin(angle) - nodeSize.height / 2
+            });
+        }
+    }
+    
+    return positions;
 }
 
 // Setup the chat interface
 function setupChat() {
-    const sendBtn = document.getElementById('chat-send');
-    const input = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('chat-send-active');
+    const input = document.getElementById('chat-input-active');
+    
+    if (!sendBtn || !input) {
+        console.warn('Chat elements not found');
+        return;
+    }
     
     sendBtn.addEventListener('click', () => sendMessage());
     input.addEventListener('keypress', (e) => {
@@ -856,7 +1304,14 @@ function setupChat() {
 
 // Send a chat message
 async function sendMessage() {
-    const input = document.getElementById('chat-input');
+    const input = document.getElementById('chat-input-active');
+    const sendBtn = document.getElementById('chat-send-active');
+    
+    if (!input || !sendBtn) {
+        console.warn('Chat input elements not found');
+        return;
+    }
+    
     const query = input.value.trim();
     
     if (!query) return;
@@ -865,35 +1320,93 @@ async function sendMessage() {
     addMessageToChat('user', query);
     input.value = '';
     
+    // Disable input while processing
+    input.disabled = true;
+    sendBtn.disabled = true;
+    sendBtn.textContent = 'Thinking...';
+    
+    // Add loading indicator
+    const loadingId = 'msg-loading-' + Date.now();
+    addMessageToChat('bot', '...', [], loadingId);
+    
     try {
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ course_id: COURSE_ID, query: query })
+            body: JSON.stringify({ 
+                course_id: COURSE_ID, 
+                query: query 
+            })
         });
         
         const result = await response.json();
         
+        // Remove loading indicator
+        const loadingMsg = document.getElementById(loadingId);
+        if (loadingMsg) loadingMsg.remove();
+        
         // Add bot response to chat
+        if (response.ok) {
         addMessageToChat('bot', result.answer, result.sources);
+        } else {
+            addMessageToChat('bot', 'Sorry, I encountered an error: ' + (result.error || 'Unknown error'));
+        }
         
     } catch (error) {
         console.error('Chat failed:', error);
+        
+        // Remove loading indicator
+        const loadingMsg = document.getElementById(loadingId);
+        if (loadingMsg) loadingMsg.remove();
+        
         addMessageToChat('bot', 'Sorry, I encountered an error. Please try again.');
+    } finally {
+        // Re-enable input
+        input.disabled = false;
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send';
+        input.focus();
     }
 }
 
 // Add a message to the chat display
-function addMessageToChat(sender, message, sources = []) {
-    const messagesDiv = document.getElementById('chat-messages');
+function addMessageToChat(sender, message, sources = [], messageId = null) {
+    const messagesDiv = document.getElementById('chat-messages-active');
+    
+    if (!messagesDiv) {
+        console.warn('Chat messages container not found');
+        return;
+    }
     
     const messageElement = document.createElement('div');
     messageElement.className = `message ${sender}-message`;
-    messageElement.innerHTML = `<p>${message}</p>`;
+    if (messageId) {
+        messageElement.id = messageId;
+    }
     
-    if (sources.length > 0) {
-        const sourcesHTML = sources.map(s => `<span class="source">${s}</span>`).join(', ');
-        messageElement.innerHTML += `<div class="sources">Sources: ${sourcesHTML}</div>`;
+    // Create message content
+    const messagePara = document.createElement('p');
+    messagePara.textContent = message;
+    messageElement.appendChild(messagePara);
+    
+    // Add sources if available
+    if (sources && sources.length > 0) {
+        const sourcesDiv = document.createElement('div');
+        sourcesDiv.className = 'sources';
+        sourcesDiv.innerHTML = '<strong>Sources:</strong> ';
+        
+        sources.forEach((source, index) => {
+            const sourceSpan = document.createElement('span');
+            sourceSpan.className = 'source';
+            sourceSpan.textContent = source;
+            sourcesDiv.appendChild(sourceSpan);
+            
+            if (index < sources.length - 1) {
+                sourcesDiv.appendChild(document.createTextNode(', '));
+            }
+        });
+        
+        messageElement.appendChild(sourcesDiv);
     }
     
     messagesDiv.appendChild(messageElement);
@@ -902,23 +1415,34 @@ function addMessageToChat(sender, message, sources = []) {
 
 // Show chat interface and set up handlers
 function showChatInterface() {
+    console.log('showChatInterface called');
     const chatInterface = document.getElementById('chat-interface');
-    if (!chatInterface) return;
+    console.log('chatInterface element:', chatInterface);
     
-    // Show the chat interface
-    chatInterface.style.display = 'block';
+    if (!chatInterface) {
+        console.error('Chat interface element not found!');
+        return;
+    }
+    
+    // Show the chat interface (use flex to match CSS definition)
+    chatInterface.style.display = 'flex';
+    console.log('Set display to flex');
     
     // Set up chat handlers
     setupChatHandlers();
+    console.log('Setup chat handlers');
     
     // Set up collapse/expand functionality
     setupChatToggle();
+    console.log('Setup chat toggle');
     
     // Set up back to edit button
     setupBackToEditButton();
+    console.log('Setup back to edit button');
     
     // Add welcome message
     addChatMessage('assistant', 'Course generated! You can now ask me questions about your course materials.');
+    console.log('Added welcome message');
 }
 
 // Set up back to edit button functionality
@@ -1043,7 +1567,7 @@ async function sendChatMessage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 course_id: COURSE_ID,
-                message: message
+                query: message
             })
         });
         
@@ -1057,7 +1581,16 @@ async function sendChatMessage() {
         removeChatMessage(loadingId);
         
         // Add assistant response
-        addChatMessage('assistant', result.response || 'Sorry, I could not generate a response.');
+        const answer = result.answer || result.response || 'Sorry, I could not generate a response.';
+        addChatMessage('assistant', answer);
+        
+        // Add sources if available
+        if (result.sources && result.sources.length > 0) {
+            const sourcesText = '📚 Sources:\n' + result.sources.map((src, i) => 
+                `${i + 1}. ${src}`
+            ).join('\n');
+            addChatMessage('sources', sourcesText);
+        }
         
     } catch (error) {
         console.error('Chat error:', error);
@@ -1082,6 +1615,7 @@ function addChatMessage(type, text) {
     
     const messageDiv = document.createElement('div');
     messageDiv.className = `chat-message ${type}`;
+    messageDiv.style.whiteSpace = 'pre-wrap';
     messageDiv.textContent = text;
     
     // Generate unique ID for the message
@@ -1134,14 +1668,6 @@ function setupChatToggle() {
             chatInterface.classList.remove('collapsed');
         });
     }
-}
-
-// Setup file toggle functionality
-function setupFileToggle() {
-    const toggleBtn = document.getElementById('toggle-files');
-    
-    // TODO: Implement file list toggle
-    // Show/hide file nodes in the graph
 }
 
 // Initialize on page load

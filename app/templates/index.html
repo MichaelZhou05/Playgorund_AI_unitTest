@@ -60,63 +60,6 @@
             <p>Analyzing course syllabus and generating suggested topics...</p>
             <div class="spinner"></div>
         </div>
-        
-        <!-- Editor State: Shown after topics are generated -->
-        <div id="init-editor" style="display:none;">
-            <p>Review and edit the AI-generated topics for your course:</p>
-            <p class="editor-instructions">Click on a topic to edit its name and summary</p>
-            
-            <!-- Visual node canvas for topics -->
-            <div id="topic-canvas"></div>
-            
-            <!-- Action buttons -->
-            <div class="generate-action">
-                <button id="add-topic-btn" class="add-topic-floating">
-                    <span class="plus-icon">+</span>
-                    <span>Add Topic</span>
-                </button>
-                <button id="generate-course-btn">Generate Course</button>
-            </div>
-
-            <!-- Chat Interface (shown after generation) -->
-            <div id="chat-interface" style="display: none;">
-                <button id="chat-toggle-btn" class="chat-toggle" title="Collapse chat">
-                    <span class="arrow-icon">▼</span>
-                </button>
-                <div id="chat-messages-container">
-                    <div id="chat-messages"></div>
-                </div>
-                <div id="chat-input-container">
-                    <button id="back-to-edit-btn" class="back-to-edit-btn" title="Edit Topics">
-                        <span class="edit-icon">✏️</span>
-                        <span class="edit-text">Edit Topics</span>
-                    </button>
-                    <input type="text" id="chat-input" placeholder="Ask questions about your course..." />
-                    <button id="chat-send-btn" class="btn-primary">Send</button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Edit Modal -->
-        <div id="edit-modal" class="modal" style="display:none;">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2>Edit Topic</h2>
-                    <button class="modal-close">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <label for="edit-topic-name">Topic Name:</label>
-                    <input type="text" id="edit-topic-name" placeholder="Enter topic name">
-                    
-                    <label for="edit-topic-summary">Summary:</label>
-                    <textarea id="edit-topic-summary" rows="5" placeholder="Enter topic summary"></textarea>
-                </div>
-                <div class="modal-footer">
-                    <button id="save-topic-btn" class="btn-primary">Save</button>
-                    <button id="cancel-edit-btn" class="btn-secondary">Cancel</button>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- STATE: NOT_READY - Student sees this when course not initialized -->
@@ -134,26 +77,24 @@
 
     <!-- STATE: ACTIVE - Main application interface -->
     <div id="app-page" class="page-state" style="display:none;">
-        <h1>Canvas TA-Bot</h1>
+        <!-- Full-screen Knowledge Graph Visualization -->
+        <div id="graph-network-active"></div>
         
-        <!-- Knowledge Graph Visualization -->
-        <div id="graph-container">
-            <div id="graph-network"></div>
-            <div id="graph-info">
-                <h3>Click a node to see details</h3>
-                <div id="node-details"></div>
+        <!-- Collapsible Chat Interface (Bottom) -->
+        <div id="chat-interface-active" class="chat-interface">
+            <button id="chat-toggle-btn-active" class="chat-toggle">
+                <span class="arrow-icon">▼</span>
+            </button>
+            <div id="chat-messages-container-active">
+                <div id="chat-messages-active"></div>
             </div>
-        </div>
-
-        <!-- Toggle for Course Files -->
-        <button id="toggle-files">Show Course Files</button>
-
-        <!-- Chat Interface -->
-        <div id="chat-container">
-            <div id="chat-messages"></div>
-            <div id="chat-input-area">
-                <input type="text" id="chat-input" placeholder="Ask the TA bot a question..." />
-                <button id="chat-send">Send</button>
+            <div id="chat-input-container-active">
+                <button id="back-to-edit-btn-active" class="back-to-edit-btn" title="Edit Topics">
+                    <span class="edit-icon">✏️</span>
+                    <span class="edit-text">Edit Topics</span>
+                </button>
+                <input type="text" id="chat-input-active" placeholder="Ask questions about your course..." />
+                <button id="chat-send-active" class="btn-primary">Send</button>
             </div>
         </div>
     </div>

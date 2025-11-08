@@ -32,7 +32,17 @@ def launch():
     # Determine application state
     state = firestore_service.get_course_state(course_id)
     
-    # Render the single-page app with injected state
+    # Render editor template when course is ACTIVE
+    if state == 'ACTIVE':
+        return render_template(
+            'editor.html',
+            course_id=course_id,
+            user_roles=role,
+            user_id=user_id,
+            app_state=state
+        )
+    
+    # Otherwise render the single-page app with injected state
     return render_template(
         'index.html',
         course_id=course_id,
@@ -64,15 +74,25 @@ def initialize_course():
     try:
         data = request.json
         course_id = data.get('course_id')
-        topics = data.get('topics')
-        if not topics or not any(t.strip() for t in topics.split(",")):
-            return jsonify({"error": "topics is required"}), 400
-        topics = topics.split(",")
+        topics = data.get('topics')  # Optional now
         
         if not course_id:
             return jsonify({"error": "course_id is required"}), 400
         
         logger.info(f"Starting initialization for course {course_id}")
+        
+        # Auto-extract topics if not provided
+        if not topics or not any(t.strip() for t in topics.split(",")):
+            logger.info("No topics provided, auto-extracting from syllabus...")
+            syllabus_text = canvas_service.get_syllabus(course_id, CANVAS_TOKEN)
+            
+            if not syllabus_text or len(syllabus_text.strip()) < 100:
+                return jsonify({"error": "Cannot auto-generate: syllabus not found or too short"}), 400
+            
+            topics = kg_service.extract_topics_from_syllabus(syllabus_text)
+            logger.info(f"Auto-extracted topics: {topics}")
+        else:
+            topics = topics.split(",")
         
         # Step 1: Create Firestore doc with status: GENERATING
         logger.info("Step 1: Creating Firestore document...")
@@ -146,7 +166,10 @@ def initialize_course():
             "status": "complete",
             "corpus_id": corpus_id,
             "files_count": len(files),
-            "uploaded_count": successful_uploads
+            "uploaded_count": successful_uploads,
+            "kg_nodes": kg_nodes,
+            "kg_edges": kg_edges,
+            "kg_data": kg_data
         })
         
     except Exception as e:
@@ -172,17 +195,28 @@ def chat():
     """
     Handles student questions using the RAG-powered TA bot.
     """
-    data = request.json
-    course_id = data.get('course_id')
-    query = data.get('query')
+    try:
+        data = request.json
+        course_id = data.get('course_id')
+        query = data.get('query')
 
-    course_data = firestore_service.get_course_data(course_id)
-    corpus_id = course_data.get('corpus_id')
-
-    answer, sources  = gemini_service.generate_answer_with_context(
-        query=query,
-        corpus_id=corpus_id,
-    )
+        course_data = firestore_service.get_course_data(course_id)
+        
+        # Convert DocumentSnapshot to dict
+        data_dict = course_data.to_dict()
+        corpus_id = data_dict.get('corpus_id')
+        answer, sources  = gemini_service.generate_answer_with_context(
+            query=query,
+            corpus_id=corpus_id,
+        )
+    except Exception as e:
+        print(f"[CHAT ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "error": str(e),
+            "response": f"Sorry, an error occurred: {str(e)}"
+        }), 500
 
     logger.info(f"Logging chat query for course {course_id}: {query[:50]}...")
     doc_id = analytics_logging_service.log_chat_query(
@@ -195,7 +229,8 @@ def chat():
     return jsonify({
         "answer": answer,
         "sources": sources,
-        "log_doc_id": doc_id
+        "log_doc_id": doc_id,
+        "response": answer 
     })
 
 
