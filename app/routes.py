@@ -6,6 +6,7 @@ from flask import request, render_template, jsonify, current_app as app
 from .services import firestore_service, rag_service, kg_service, canvas_service, gcs_service, gemini_service
 import os
 import logging
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +111,6 @@ def initialize_course():
         logger.info("Step 6: Cleaning up local files...")
         local_dir = os.path.join('app', 'data', 'courses', course_id)
         if os.path.exists(local_dir):
-            import shutil
             shutil.rmtree(local_dir)
             logger.info(f"Deleted local directory: {local_dir}")
         

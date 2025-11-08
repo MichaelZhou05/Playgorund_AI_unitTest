@@ -5,6 +5,7 @@ Tests the initialize_course logic without running the Flask app.
 import os
 import logging
 from dotenv import load_dotenv
+import shutil
 
 # Load environment variables
 load_dotenv()
@@ -108,7 +109,6 @@ def test_initialize_course(course_id: str, topics: str):
         logger.info("="*70)
         local_dir = os.path.join('app', 'data', 'courses', course_id)
         if os.path.exists(local_dir):
-            import shutil
             shutil.rmtree(local_dir)
             logger.info(f"✓ Deleted local directory: {local_dir}")
         else:
