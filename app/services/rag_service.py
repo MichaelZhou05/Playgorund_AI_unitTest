@@ -356,7 +356,6 @@ Questions:"""
 if __name__ == "__main__":
     # Load environment variables from root .env file
     from dotenv import load_dotenv
-    import sys
     
     # Get the root directory (2 levels up from this file)
     root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
