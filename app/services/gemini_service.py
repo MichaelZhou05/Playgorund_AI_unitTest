@@ -226,7 +226,6 @@ Questions:"""
 if __name__ == "__main__":
     # Test the Gemini service
     from dotenv import load_dotenv
-    import sys
     
     # Load environment variables
     env_path = os.path.join(root_dir, '.env')
