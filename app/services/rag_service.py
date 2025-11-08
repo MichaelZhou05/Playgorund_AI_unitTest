@@ -8,6 +8,7 @@ from vertexai.preview.rag.utils.resources import RagCorpus, RagFile
 from vertexai.generative_models import GenerativeModel
 import os
 import logging
+import re
 from typing import List, Tuple, Dict
 
 logger = logging.getLogger(__name__)
@@ -339,7 +340,6 @@ Questions:"""
         cleaned_questions = []
         for q in questions:
             # Remove common numbering patterns
-            import re
             cleaned = re.sub(r'^\d+[\.)]\s*', '', q)
             cleaned = re.sub(r'^[-*]\s*', '', cleaned)
             if cleaned:
