@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas TA-Bot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='vis-network.min.js') }}"></script>
+</head>
+<body>
+    <!-- ROLE 1: Frontend Developer - Build all UI states here -->
+    
+    <!-- Inject server-side data -->
+    <script>
+        const COURSE_ID = "{{ course_id }}";
+        const USER_ROLES = "{{ user_roles }}";
+        const APP_STATE = "{{ app_state }}";
+    </script>
+
+    <!-- STATE: NEEDS_INIT - Professor initializes course -->
+    <div id="init-page" class="page-state">
+        <h1>Initialize Course Knowledge Base</h1>
+        <p>Enter the topics for this course (one per line):</p>
+        <textarea id="topics-input" rows="10" cols="50"></textarea>
+        <button id="init-btn">Initialize</button>
+    </div>
+
+    <!-- STATE: NOT_READY - Student sees this when course not initialized -->
+    <div id="not-ready-page" class="page-state" style="display:none;">
+        <h1>Knowledge Base Not Available</h1>
+        <p>This tool is not yet enabled for your course. Please contact your instructor.</p>
+    </div>
+
+    <!-- STATE: GENERATING - Shows loading spinner -->
+    <div id="loading-page" class="page-state" style="display:none;">
+        <h1>Building Knowledge Base...</h1>
+        <p>Please wait while we index your course materials and build the knowledge graph.</p>
+        <div class="spinner"></div>
+    </div>
+
+    <!-- STATE: ACTIVE - Main application interface -->
+    <div id="app-page" class="page-state" style="display:none;">
+        <h1>Canvas TA-Bot</h1>
+        
+        <!-- Knowledge Graph Visualization -->
+        <div id="graph-container">
+            <div id="graph-network"></div>
+            <div id="graph-info">
+                <h3>Click a node to see details</h3>
+                <div id="node-details"></div>
+            </div>
+        </div>
+
+        <!-- Toggle for Course Files -->
+        <button id="toggle-files">Show Course Files</button>
+
+        <!-- Chat Interface -->
+        <div id="chat-container">
+            <div id="chat-messages"></div>
+            <div id="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Ask the TA bot a question..." />
+                <button id="chat-send">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
