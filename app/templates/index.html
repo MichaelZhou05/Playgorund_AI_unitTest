@@ -69,13 +69,12 @@
             <!-- Visual node canvas for topics -->
             <div id="topic-canvas"></div>
             
-            <!-- Add topic button (bottom right) -->
-            <button id="add-topic-btn" class="add-topic-floating">
-                <span class="plus-icon">+</span>
-            </button>
-            
-            <!-- Generate course button -->
+            <!-- Action buttons -->
             <div class="generate-action">
+                <button id="add-topic-btn" class="add-topic-floating">
+                    <span class="plus-icon">+</span>
+                    <span>Add Topic</span>
+                </button>
                 <button id="generate-course-btn">Generate Course</button>
             </div>
 
@@ -88,6 +87,10 @@
                     <div id="chat-messages"></div>
                 </div>
                 <div id="chat-input-container">
+                    <button id="back-to-edit-btn" class="back-to-edit-btn" title="Edit Topics">
+                        <span class="edit-icon">✏️</span>
+                        <span class="edit-text">Edit Topics</span>
+                    </button>
                     <input type="text" id="chat-input" placeholder="Ask questions about your course..." />
                     <button id="chat-send-btn" class="btn-primary">Send</button>
                 </div>

@@ -87,20 +87,27 @@ async function loadSuggestedTopics() {
     } catch (error) {
         console.error('Failed to generate topics:', error);
         
-        // Show friendly error message with manual option
+        // Show enhanced error message with Airbnb-style design
         loadingDiv.innerHTML = `
-            <!-- Decorative dots for error page -->
-            <div class="error-dot error-dot-1"></div>
-            <div class="error-dot error-dot-2"></div>
-            <div class="error-dot error-dot-3"></div>
-            <div class="error-dot error-dot-4"></div>
-            
             <div class="generation-failed">
-                <h3 style="color: #dc3545;">⚠️ Auto-Generation Not Available</h3>
-                <p style="margin-bottom: 20px;">We couldn't automatically generate topics from your syllabus at this time.</p>
-                <p style="margin-bottom: 30px;">No worries! You can create topics manually and customize them to fit your course perfectly.</p>
-                <button id="start-manual-btn" style="background: #28a745; color: white; border: none; border-radius: 12px; cursor: pointer;">
-                    Create Topics Manually ✨
+                <div class="error-illustration">
+                    <div class="sad-face">
+                        <div class="face-circle">
+                            <div class="eye left-eye"></div>
+                            <div class="eye right-eye"></div>
+                            <div class="mouth"></div>
+                        </div>
+                        <div class="sparkle sparkle-1">✨</div>
+                        <div class="sparkle sparkle-2">⚡</div>
+                        <div class="sparkle sparkle-3">💫</div>
+                    </div>
+                </div>
+                <h2 class="error-title">Oops!</h2>
+                <p class="error-message">We can't seem to generate topics automatically right now.</p>
+                <p class="error-hint">But don't worry! You can still create an amazing course by adding topics manually.</p>
+                <button id="start-manual-btn" class="manual-btn">
+                    <span class="btn-icon">✏️</span>
+                    <span class="btn-text">Create Topics Manually</span>
                 </button>
             </div>
         `;
@@ -121,15 +128,19 @@ async function loadSuggestedTopics() {
 }
 
 // Calculate node size based on text content (returns width and height for ovals)
-function calculateNodeSize(topic, summary) {
+function calculateNodeSize(topic, summary, skipVariation = false) {
     // Calculate total text length
     const topicLength = topic.length;
     const summaryLength = summary.length;
     const totalLength = topicLength + summaryLength;
     
+    // Also consider the number of lines in summary (newlines increase height)
+    const summaryLines = summary.split('\n').length;
+    const lineHeightFactor = Math.max(1, summaryLines * 0.3);
+    
     // Define size ranges for horizontal ovals (width > height)
-    // Width ranges from 240px to 500px
-    // Height ranges from 120px to 280px
+    // Width ranges from 240px to 600px (increased max for longer content)
+    // Height ranges from 120px to 350px (increased max for longer content)
     let width, height;
     
     if (totalLength < 80) {
@@ -150,18 +161,34 @@ function calculateNodeSize(topic, summary) {
     } else if (totalLength < 300) {
         width = 460;
         height = 240;
-    } else {
-        width = 500;
+    } else if (totalLength < 400) {
+        width = 520;
         height = 280;
+    } else if (totalLength < 500) {
+        width = 560;
+        height = 310;
+    } else {
+        width = 600;
+        height = 350;
     }
     
-    // Add slight variation for more organic look
-    const widthVariation = Math.random() * 20 - 10; // -10 to +10
-    const heightVariation = Math.random() * 15 - 7.5; // -7.5 to +7.5
+    // Adjust height based on line count
+    height = Math.min(350, height * lineHeightFactor);
+    
+    // Add slight variation for more organic look (only on initial render)
+    if (!skipVariation) {
+        const widthVariation = Math.random() * 20 - 10; // -10 to +10
+        const heightVariation = Math.random() * 15 - 7.5; // -7.5 to +7.5
+        
+        return {
+            width: Math.max(240, Math.min(600, width + widthVariation)),
+            height: Math.max(120, Math.min(350, height + heightVariation))
+        };
+    }
     
     return {
-        width: Math.max(240, Math.min(500, width + widthVariation)),
-        height: Math.max(120, Math.min(280, height + heightVariation))
+        width: Math.max(240, Math.min(600, width)),
+        height: Math.max(120, Math.min(350, height))
     };
 }
 
@@ -304,6 +331,9 @@ function setupInlineEditHandlers(element, index, field) {
         const newValue = element.textContent.trim();
         if (newValue && window.topicsData[index]) {
             window.topicsData[index][field] = newValue;
+            
+            // Recalculate and apply new size based on updated content
+            resizeNodeAfterEdit(node, index);
         }
         
         // Check if no other element in this node is focused
@@ -332,6 +362,26 @@ function setupInlineEditHandlers(element, index, field) {
             element.blur(); // Save and exit editing
         }
     });
+}
+
+// Resize node after editing to fit content
+function resizeNodeAfterEdit(node, index) {
+    if (!window.topicsData[index]) return;
+    
+    const topic = window.topicsData[index].topic;
+    const summary = window.topicsData[index].summary;
+    
+    // Calculate new size based on updated content
+    const newSize = calculateNodeSize(topic, summary);
+    
+    // Update stored size
+    if (window.nodeSizes) {
+        window.nodeSizes[index] = newSize;
+    }
+    
+    // Apply new size with smooth transition
+    node.style.width = newSize.width + 'px';
+    node.style.height = newSize.height + 'px';
 }
 
 // Zoom in and center a node
@@ -616,12 +666,24 @@ async function animateNodesForGeneration() {
     // Add finalizing class to canvas
     canvas.classList.add('finalizing');
     
-    // Fade out all delete buttons
+    // Fade out all delete buttons and disable editing
     nodes.forEach(node => {
         const deleteBtn = node.querySelector('.node-delete-btn');
         if (deleteBtn) {
             deleteBtn.style.opacity = '0';
             deleteBtn.style.pointerEvents = 'none';
+        }
+        
+        // Disable editing on title and summary
+        const title = node.querySelector('.node-title');
+        const summary = node.querySelector('.node-summary');
+        if (title) {
+            title.contentEditable = 'false';
+            title.style.cursor = 'default';
+        }
+        if (summary) {
+            summary.contentEditable = 'false';
+            summary.style.cursor = 'default';
         }
         
         // Remove hover effects
@@ -852,8 +914,87 @@ function showChatInterface() {
     // Set up collapse/expand functionality
     setupChatToggle();
     
+    // Set up back to edit button
+    setupBackToEditButton();
+    
     // Add welcome message
     addChatMessage('assistant', 'Course generated! You can now ask me questions about your course materials.');
+}
+
+// Set up back to edit button functionality
+function setupBackToEditButton() {
+    const backToEditBtn = document.getElementById('back-to-edit-btn');
+    if (!backToEditBtn) return;
+    
+    backToEditBtn.addEventListener('click', () => {
+        returnToEditMode();
+    });
+}
+
+// Return to edit mode from finalized state
+function returnToEditMode() {
+    const canvas = document.getElementById('topic-canvas');
+    const chatInterface = document.getElementById('chat-interface');
+    const generateAction = document.querySelector('.generate-action');
+    const generateBtn = document.getElementById('generate-course-btn');
+    const addBtn = document.getElementById('add-topic-btn');
+    const nodes = canvas.querySelectorAll('.topic-node');
+    
+    // Hide chat interface
+    if (chatInterface) {
+        chatInterface.style.display = 'none';
+    }
+    
+    // Show generate button again and reset its state
+    if (generateAction) {
+        generateAction.style.display = 'flex';
+    }
+    
+    // Reset generate button to original state
+    if (generateBtn) {
+        generateBtn.disabled = false;
+        generateBtn.textContent = 'Generate Course';
+    }
+    
+    // Show add button
+    if (addBtn) {
+        addBtn.style.opacity = '1';
+        addBtn.style.pointerEvents = 'auto';
+        addBtn.style.display = 'inline-flex';
+    }
+    
+    // Remove finalizing class
+    canvas.classList.remove('finalizing');
+    
+    // Re-enable all nodes for editing
+    nodes.forEach(node => {
+        // Show delete buttons
+        const deleteBtn = node.querySelector('.node-delete-btn');
+        if (deleteBtn) {
+            deleteBtn.style.opacity = '1';
+            deleteBtn.style.pointerEvents = 'auto';
+        }
+        
+        // Re-enable editing on title and summary
+        const title = node.querySelector('.node-title');
+        const summary = node.querySelector('.node-summary');
+        if (title) {
+            title.contentEditable = 'true';
+            title.style.cursor = 'text';
+        }
+        if (summary) {
+            summary.contentEditable = 'true';
+            summary.style.cursor = 'text';
+        }
+        
+        // Restore hover effects
+        node.style.cursor = 'pointer';
+    });
+    
+    // Re-render with original scattered positions
+    if (window.topicsData) {
+        renderTopicEditor(window.topicsData);
+    }
 }
 
 // Set up chat event handlers
