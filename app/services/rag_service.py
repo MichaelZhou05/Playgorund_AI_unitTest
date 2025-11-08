@@ -165,9 +165,9 @@ def retrieve_context(corpus_id: str, query: str, top_k: int = 10, threshold: flo
         # Extract unique source files from source URI
         source_names = []
         for context in contexts:
-            if hasattr(context, 'source') and context.source:
+            if hasattr(context, 'source_uri') and context.source_uri:
                 # Source is in format like "gs://bucket/corpus/file.pdf"
-                source_path = context.source.uri if hasattr(context.source, 'uri') else str(context.source)
+                source_path = context.source_uri
                 filename = source_path.split('/')[-1] if '/' in source_path else source_path
                 if filename and filename not in source_names:
                     source_names.append(filename)
