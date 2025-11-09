@@ -18,10 +18,10 @@ logger = logging.getLogger(__name__)
 
 
 SUMMARY_QUERY_TEMPLATE = (
-    "Write a 1-paragraph summary for the topic: {topic}."
+    "Write a 1-paragraph summary for the topic. Make clear what likely are the learning objectives and what student should focus on during the course: {topic}. Go straight to the summary, no intro or outro."
 )
 
-NUM_TOPICS = 10
+NUM_TOPICS = 9
 def extract_topics_from_summaries(summaries: List[str], num_topics=NUM_TOPICS) -> List[str]:
     """
     Uses Gemini to extract main course topics from syllabus text.
@@ -35,8 +35,9 @@ def extract_topics_from_summaries(summaries: List[str], num_topics=NUM_TOPICS) -
     """
     all_summaries= "\n".join(summaries)
     prompt = f"""
-    Analyze these document summaries and group the topics discuessed into about {num_topics} most important topics covered. Do not create more than necessary. Also, only include taught topics, not course policies or syllabi. The course topcics generated should be suitable for creating a knowledge graph for student learning. They should cover broad themes of the entire course. Each course content (lecture, assignment, reading) should be represented in at least one topic. Topics should be only a few words long.
+    Analyze these document summaries and group the topics discussed into {num_topics} most important topics covered. Do not create more than necessary. Also, only include taught topics, not course policies or syllabi. The course topcics generated should be suitable for creating a knowledge graph for student learning. They should cover broad themes of the entire course. Each course content (lecture, assignment, reading) should be represented in at least one topic. Topics should be only a few words long.
 Return ONLY a comma-separated list of topics in order of importance, nothing else.
+You should do do {num_topics} topics. Give or take one. You should not exceed {num_topics} by more than one.
 
 Example output: Machine Learning, Neural Networks, Data Processing, Model Evaluation
 
@@ -45,7 +46,7 @@ Summaries: {all_summaries}"""
     try:
         topics_text = gemini_service.generate_answer(prompt)
         topics = [t.strip() for t in topics_text.split(',') if t.strip()]
-        return topics
+        return topics[:num_topics]
     except Exception as e:
         logger.error(f"Failed to extract topics from syllabus: {e}")
         raise

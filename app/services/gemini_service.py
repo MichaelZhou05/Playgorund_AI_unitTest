@@ -90,7 +90,7 @@ def get_embedding(text: str, model_name: str = "text-embedding-004", task_type: 
 
 SUMMARIZE_PROMPT = """
     Summarize this file in one paragraph, specifically the topics that are covered, both broad and specific.
-    Someone reading the summary should understand what subjects are discussed in the file. Don't get too detailed.
+    Someone reading the summary should understand what subjects are discussed in the file and what the learning objectives likely are. Don't get too detailed.
     Being the summary now with "This file discusses..."
 """
 def summarize_file(file_path: str, prompt: str = SUMMARIZE_PROMPT, model_name: str = DEFAULT_MODEL) -> str:
