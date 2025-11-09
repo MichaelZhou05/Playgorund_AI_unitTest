@@ -21,7 +21,7 @@ SUMMARY_QUERY_TEMPLATE = (
     "Write a 1-paragraph summary for the topic: {topic}."
 )
 
-def extract_topics_from_syllabus(syllabus_text: str, count: int = 8) -> List[str]:
+def extract_topics_from_summaries(summaries: List[str]) -> List[str]:
     """
     Uses Gemini to extract main course topics from syllabus text.
     
@@ -32,18 +32,18 @@ def extract_topics_from_syllabus(syllabus_text: str, count: int = 8) -> List[str
     Returns:
         List of topic strings
     """
-    prompt = f"""Analyze this course syllabus and extract the {count} most important topics covered.
+    all_summaries= "\n".join(summaries)
+    prompt = f"""Analyze these document summaries and group the topics discuessed into 4 to 8 most important topics covered. Do not create more than necessary.
 Return ONLY a comma-separated list of topics, nothing else.
 
-Syllabus:
-{syllabus_text[:5000]}
+Example output: Machine Learning, Neural Networks, Data Processing, Model Evaluation
 
-Example output: Machine Learning, Neural Networks, Data Processing, Model Evaluation"""
+Summaries: {all_summaries}"""
     
     try:
         topics_text = gemini_service.generate_answer(prompt)
         topics = [t.strip() for t in topics_text.split(',') if t.strip()]
-        return topics[:count]
+        return topics
     except Exception as e:
         logger.error(f"Failed to extract topics from syllabus: {e}")
         raise

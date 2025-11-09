@@ -147,16 +147,12 @@ def initialize_course():
             logger.info(f"File Name: {display_name}\nSummary: {summary}")
 
 
-        # Step 4.5: Extract Topics from Rag, autogenerate topics if not provided:
+        # Step 4.5: Extract Topics from summaries, autogenerate topics if not provided:
+        summaries = file_to_summary.values()
         logger.info(f"topics: {topics}")
         if not topics or not any(t.strip() for t in topics.split(",")):
-            logger.info("No topics provided, auto-extracting generating topics from RAG")
-            syllabus_text = canvas_service.get_syllabus(course_id, CANVAS_TOKEN)
-            logger.info(f"Syllabus Text: {syllabus_text}")
-            if not syllabus_text or len(syllabus_text.strip()) < 100:
-                return jsonify({"error": "Cannot auto-generate: syllabus not found or too short"}), 400
-            
-            topics = kg_service.extract_topics_from_syllabus(syllabus_text)
+            logger.info("No topics provided, auto-extracting generating topics from files")
+            topics = kg_service.extract_topics_from_summaries(summaries)
             logger.info(f"Auto-extracted topics: {topics}")
         else:
             topics = topics.split(",")
@@ -435,24 +431,3 @@ def run_analytics():
             "error": "Failed to run analytics",
             "message": str(e)
         }), 500
-
-import mimetypes
-from PyPDF2 import PdfReader
-from docx import Document
-
-def extract_text_from_file(path):
-    mime, _ = mimetypes.guess_type(path)
-
-    if mime == "application/pdf":
-        reader = PdfReader(path)
-        return "\n".join([page.extract_text() for page in reader.pages])
-
-    elif mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-        doc = Document(path)
-        return "\n".join([p.text for p in doc.paragraphs])
-
-    elif mime and mime.startswith("text"):
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
-
-    return ""
