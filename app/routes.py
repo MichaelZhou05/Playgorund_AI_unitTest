@@ -195,6 +195,7 @@ def initialize_course():
 
         # Step 4.3: Summarize all files included:
         file_to_summary = {}
+        files_processed = 0
 
         for file in files:
             local_path = file.get("local_path")
@@ -210,6 +211,7 @@ def initialize_course():
             )
 
             file_to_summary[display_name] = summary
+            files_processed += 1
             logger.info(f"File Name: {display_name}\nSummary: {summary}")
 
 
@@ -268,6 +270,7 @@ def initialize_course():
         
     except Exception as e:
         logger.error(f"Error initializing course {course_id or 'unknown'}: {str(e)}", exc_info=True)
+        
         
         # Try to update Firestore with error status
         try:
@@ -342,6 +345,20 @@ def get_graph():
         "edges": course_data.get("kg_edges"),
         "data": course_data.get("kg_data")
     })
+
+
+@app.route('/api/init-logs/<course_id>', methods=['GET'])
+def get_init_logs(course_id):
+    """
+    Retrieves initialization logs for a course.
+    Used for real-time log display during course initialization.
+    """
+    try:
+        logs = firestore_service.get_init_logs(course_id)
+        return jsonify({"logs": logs})
+    except Exception as e:
+        logger.error(f"Failed to retrieve init logs: {e}")
+        return jsonify({"error": str(e), "logs": []}), 500
 
 
 @app.route('/api/download-source', methods=['GET'])
