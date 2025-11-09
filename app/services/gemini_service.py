@@ -11,6 +11,8 @@ This service provides functions to:
 This service handles all LLM prompting and response formatting.
 """
 from vertexai.generative_models import GenerativeModel
+from google.generativeai import GenerativeModel
+import mimetypes
 import os
 import logging
 from typing import List, Tuple
@@ -84,6 +86,51 @@ def get_embedding(text: str, model_name: str = "text-embedding-004", task_type: 
         
     except Exception as e:
         logger.error(f"Failed to generate embedding: {e}", exc_info=True)
+        raise
+
+
+def summarize_file(file_path: str, prompt: str = "Summarize this file in one paragraph, specifically the topics that are covered, both broad and specific.", model_name: str = DEFAULT_MODEL) -> str:
+    """
+    Summarize a local file using Gemini.
+
+    Args:
+        file_path: Local file path
+        prompt: Instruction to send
+        model_name: Gemini model to use
+
+    Returns:
+        Summary text
+    """
+    if not project_id:
+        raise ValueError("GOOGLE_CLOUD_PROJECT environment variable not set")
+
+    # Determine MIME type (e.g. application/pdf)
+    mime_type, _ = mimetypes.guess_type(file_path)
+    if mime_type is None:
+        # default to binary if unknown
+        mime_type = "application/octet-stream"
+
+    # Load file bytes
+    with open(file_path, "rb") as f:
+        file_bytes = f.read()
+
+    # Create a Gemini Part
+    file_part = {
+        "mime_type": mime_type,
+        "data": file_bytes
+    }
+
+    try:
+        model = GenerativeModel(model_name)
+
+        response = model.generate_content(
+            [file_part, prompt]
+        )
+
+        return response.text
+
+    except Exception as e:
+        logger.error(f"Failed to summarize {file_path}: {str(e)}")
         raise
 
 

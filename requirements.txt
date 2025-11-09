@@ -8,6 +8,9 @@ google-cloud-storage
 google-cloud-aiplatform
 vertexai
 
+# Google Gemini
+generativeai
+
 # Graph
 networkx
 
@@ -20,3 +23,4 @@ python-dotenv
 
 # Other
 python-dotenv
+

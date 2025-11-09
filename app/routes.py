@@ -148,19 +148,18 @@ def initialize_course():
             return jsonify({"error": "course_id is required"}), 400
         
         logger.info(f"Starting initialization for course {course_id}")
-        logger.info(f"topics: {topics}")
-        # Auto-extract topics if not provided
-        if not topics or not any(t.strip() for t in topics.split(",")):
-            logger.info("No topics provided, auto-extracting from syllabus...")
-            syllabus_text = canvas_service.get_syllabus(course_id, CANVAS_TOKEN)
-            logger.info(f"Syllabus Text: {syllabus_text}")
-            if not syllabus_text or len(syllabus_text.strip()) < 100:
-                return jsonify({"error": "Cannot auto-generate: syllabus not found or too short"}), 400
+        # # Auto-extract topics if not provided
+        # if not topics or not any(t.strip() for t in topics.split(",")):
+        #     logger.info("No topics provided, auto-extracting from syllabus...")
+        #     syllabus_text = canvas_service.get_syllabus(course_id, CANVAS_TOKEN)
+        #     logger.info(f"Syllabus Text: {syllabus_text}")
+        #     if not syllabus_text or len(syllabus_text.strip()) < 100:
+        #         return jsonify({"error": "Cannot auto-generate: syllabus not found or too short"}), 400
             
-            topics = kg_service.extract_topics_from_syllabus(syllabus_text)
-            logger.info(f"Auto-extracted topics: {topics}")
-        else:
-            topics = topics.split(",")
+        #     topics = kg_service.extract_topics_from_syllabus(syllabus_text)
+        #     logger.info(f"Auto-extracted topics: {topics}")
+        # else:
+        #     topics = topics.split(",")
         
         # Step 1: Create Firestore doc with status: GENERATING
         logger.info("Step 1: Creating Firestore document...")
@@ -195,6 +194,36 @@ def initialize_course():
             corpus_name_suffix=f"Course {course_id}"
         )
         logger.info(f"Created corpus: {corpus_id}")
+        # Step 4.3: Summarize all files included:
+        file_to_summary = {}
+
+        for file in files:
+            local_path = file.get("local_path")
+            display_name = file.get("display_name") or f"file_{file.get('id')}"
+
+            # Skip if no local path
+            if not local_path:
+                logger.info(f"Could not locate file path for {display_name}")
+                continue
+
+            summary = gemini_service.summarize_file(
+                file_path=local_path,
+                prompt="Summarize this file in one paragraph. Describe what is covered."
+            )
+
+            file_to_summary[display_name] = summary
+            logger.info(f"File Name: {display_name}\nSummary: {summary}")
+
+
+        # Step 4.5: Extract Topics from summaries, autogenerate topics if not provided:
+        summaries = file_to_summary.values()
+        logger.info(f"topics: {topics}")
+        if not topics or not any(t.strip() for t in topics.split(",")):
+            logger.info("No topics provided, auto-extracting generating topics from files")
+            topics = kg_service.extract_topics_from_summaries(summaries)
+            logger.info(f"Auto-extracted topics: {topics}")
+        else:
+            topics = topics.split(",")
         
         # Step 5: Build knowledge graph
         logger.info("Step 5: Building knowledge graph...")
