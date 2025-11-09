@@ -68,6 +68,7 @@ function initializeEventListeners() {
     // Modal close handlers
     modalClose.addEventListener('click', closeModal);
     topicModal.addEventListener('click', (e) => {
+        // Close if clicking directly on the modal (not the content)
         if (e.target === topicModal) closeModal();
     });
     document.addEventListener('keydown', (e) => {
@@ -304,28 +305,38 @@ function renderGraph() {
             },
             font: {
                 color: '#ffffff',
-                size: isTopicNode ? 16 : 14,
-                face: 'Arial'
+                size: isTopicNode ? 18 : 15,
+                face: 'Arial',
+                bold: isTopicNode ? true : false
             },
             shape: isTopicNode ? 'box' : 'ellipse',
             size: isTopicNode ? 25 : 20,
             borderWidth: 2,
-            shadow: true
+            shadow: true,
+            margin: isTopicNode ? 15 : 10
         };
     });
 
-    // Prepare edges for vis-network
+    // Prepare edges for vis-network - flexible, flowing curves
     const edges = knowledgeGraph.kg_edges.map(edge => ({
         from: edge.from,
         to: edge.to,
-        arrows: 'to',
+        arrows: {
+            to: {
+                enabled: true,
+                scaleFactor: 1,
+                type: 'arrow'
+            }
+        },
         color: {
             color: '#cbd5e1',
             highlight: '#6366f1'
         },
         width: 2,
         smooth: {
-            type: 'continuous'
+            enabled: true,
+            type: 'dynamic',
+            roundness: 0.5
         }
     }));
 
@@ -343,14 +354,15 @@ function renderGraph() {
         physics: {
             enabled: true,
             barnesHut: {
-                gravitationalConstant: -2000,
+                gravitationalConstant: -800,
                 centralGravity: 0.3,
-                springLength: 150,
+                springLength: 120,
                 springConstant: 0.04,
-                damping: 0.09
+                damping: 0.2,
+                avoidOverlap: 0.1
             },
             stabilization: {
-                iterations: 200,
+                iterations: 250,
                 updateInterval: 25
             }
         },
@@ -364,24 +376,49 @@ function renderGraph() {
         },
         nodes: {
             shape: 'box',
-            margin: 10,
+            margin: 15,
             widthConstraint: {
-                maximum: 200
-            }
+                maximum: 250
+            },
+            borderWidth: 2,
+            borderWidthSelected: 3
         },
         edges: {
             smooth: {
                 type: 'continuous'
             }
-        }
+        },
+        configure: {
+            enabled: false
+        },
+        // Constrain nodes to stay within viewport
+        autoResize: true,
+        width: '100%',
+        height: '100%'
     };
 
     // Initialize network
     network = new vis.Network(networkCanvas, data, options);
 
-    // Handle node clicks
+    // Track dragging to prevent opening modal on drag
+    let isDragging = false;
+    let clickPosition = null;
+    
+    network.on('dragStart', function(params) {
+        isDragging = true;
+        clickPosition = params.pointer.canvas;
+    });
+    
+    network.on('dragEnd', function() {
+        setTimeout(() => {
+            isDragging = false;
+        }, 100);
+    });
+
+    // Handle node clicks - only if not dragging
     network.on('click', function(params) {
-        if (params.nodes.length > 0) {
+        // Only open modal if we didn't drag and clicked on a topic node
+        if (!isDragging && params.nodes.length > 0) {
             const nodeId = params.nodes[0];
             const node = knowledgeGraph.kg_nodes.find(n => n.id === nodeId);
             
