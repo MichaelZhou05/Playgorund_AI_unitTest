@@ -159,19 +159,6 @@ def initialize_course():
             return jsonify({"error": "course_id is required"}), 400
         
         logger.info(f"Starting initialization for course {course_id}")
-        # # Auto-extract topics if not provided
-        # if not topics or not any(t.strip() for t in topics.split(",")):
-        #     logger.info("No topics provided, auto-extracting from syllabus...")
-        #     syllabus_text = canvas_service.get_syllabus(course_id, CANVAS_TOKEN)
-        #     logger.info(f"Syllabus Text: {syllabus_text}")
-        #     if not syllabus_text or len(syllabus_text.strip()) < 100:
-        #         return jsonify({"error": "Cannot auto-generate: syllabus not found or too short"}), 400
-            
-        #     topics = kg_service.extract_topics_from_syllabus(syllabus_text)
-        #     logger.info(f"Auto-extracted topics: {topics}")
-        # else:
-        #     topics = topics.split(",")
-        
         # Step 1: Create Firestore doc with status: GENERATING
         logger.info("Step 1: Creating Firestore document...")
         firestore_service.create_course_doc(course_id)
@@ -205,6 +192,7 @@ def initialize_course():
             corpus_name_suffix=f"Course {course_id}"
         )
         logger.info(f"Created corpus: {corpus_id}")
+
         # Step 4.3: Summarize all files included:
         file_to_summary = {}
 
@@ -219,7 +207,6 @@ def initialize_course():
 
             summary = gemini_service.summarize_file(
                 file_path=local_path,
-                prompt="Summarize this file in one paragraph. Describe what is covered."
             )
 
             file_to_summary[display_name] = summary
@@ -279,6 +266,7 @@ def initialize_course():
             "kg_edges": kg_edges,
             "kg_data": kg_data
         })
+
         
     except Exception as e:
         logger.error(f"Error initializing course {course_id or 'unknown'}: {str(e)}", exc_info=True)
@@ -296,6 +284,7 @@ def initialize_course():
             "error": "Failed to initialize course",
             "message": str(e)
         }), 500
+
 
 
 @app.route('/api/chat', methods=['POST'])
