@@ -8,7 +8,7 @@ let knowledgeGraph = null;
 let currentTopic = null;
 let chatMessages = [];
 let network = null; // vis-network instance
-let currentView = 'cards'; // 'cards' or 'graph'
+let currentView = 'graph'; // 'cards' or 'graph' - default to graph
 let isChatExpanded = false;
 
 // DOM Elements

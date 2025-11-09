@@ -15,11 +15,11 @@
             
             <!-- View Toggle -->
             <div class="view-toggle">
-                <button id="cards-view-btn" class="view-btn active">
-                    <span>📱</span> Cards
-                </button>
-                <button id="graph-view-btn" class="view-btn">
+                <button id="graph-view-btn" class="view-btn active">
                     <span>🕸️</span> Graph
+                </button>
+                <button id="cards-view-btn" class="view-btn">
+                    <span>📱</span> Cards
                 </button>
             </div>
             
@@ -30,12 +30,12 @@
         </div>
 
         <!-- Topic Cards Container -->
-        <div id="topics-grid" class="topics-grid view-active">
+        <div id="topics-grid" class="topics-grid view-hidden">
             <!-- Topic cards will be dynamically inserted here -->
         </div>
 
         <!-- Graph Visualization Container (Full Screen) -->
-        <div id="graph-container" class="graph-container view-hidden">
+        <div id="graph-container" class="graph-container view-active">
             <div id="network-canvas" class="network-canvas"></div>
             
             <!-- Graph Controls -->
