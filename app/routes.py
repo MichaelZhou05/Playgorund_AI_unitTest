@@ -32,8 +32,18 @@ def launch():
     # Determine application state
     state = firestore_service.get_course_state(course_id)
     
-    # Render editor template when course is ACTIVE
+    # When course is ACTIVE, route based on role
     if state == 'ACTIVE':
+        # Students get the fun exploration interface
+        if role and 'student' in role.lower():
+            return render_template(
+                'student_view.html',
+                course_id=course_id,
+                user_id=user_id,
+                role=role
+            )
+        
+        # Professors/instructors get the editor
         return render_template(
             'editor.html',
             course_id=course_id,
@@ -68,6 +78,45 @@ def analytics_dashboard(course_id):
     return render_template(
         'analytics.html',
         course_id=course_id,
+    )
+
+
+@app.route('/student/<course_id>', methods=['GET'])
+def student_view(course_id):
+    """
+    Student View - Interactive knowledge graph exploration interface.
+    
+    Provides a fun, engaging UI for students to:
+    - Browse topics in a card-based grid layout
+    - Click topics to see detailed summaries in a modal
+    - Chat with the AI assistant about course content
+    - Access related resources for each topic
+    
+    This route should be used when the course is ACTIVE and the user is a student.
+    """
+    # Get user info from session
+    user_id = session.get('user_id', 'unknown')
+    role = session.get('role', 'student')
+    
+    # Verify course is active
+    state = firestore_service.get_course_state(course_id)
+    
+    if state != 'ACTIVE':
+        # Redirect to main launch if course is not active
+        return render_template(
+            'index.html',
+            course_id=course_id,
+            user_roles=role,
+            user_id=user_id,
+            app_state=state
+        )
+    
+    # Render the student view
+    return render_template(
+        'student_view.html',
+        course_id=course_id,
+        user_id=user_id,
+        role=role
     )
 
 
