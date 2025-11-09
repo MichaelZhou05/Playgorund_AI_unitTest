@@ -96,6 +96,69 @@ function initializeEventListeners() {
         // Close if clicking directly on the modal (not the content)
         if (e.target === topicModal) closeModal();
     });
+    
+    // Remove topic button handler
+    const removeTopicBtn = document.getElementById('remove-topic-btn');
+    if (removeTopicBtn) {
+        removeTopicBtn.addEventListener('click', async () => {
+            if (!currentTopic) {
+                alert("No topic selected");
+                return;
+            }
+            
+            // Confirm deletion
+            const topicName = currentTopic.label;
+            const confirmed = confirm(`Are you sure you want to remove the topic "${topicName}"?\n\nThis action cannot be undone.`);
+            
+            if (!confirmed) {
+                return;
+            }
+            
+            try {
+                // Show loading state
+                removeTopicBtn.disabled = true;
+                removeTopicBtn.textContent = "Removing...";
+                
+                // POST to backend
+                const response = await fetch('/api/remove-topic', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        course_id: COURSE_ID,
+                        topic_id: currentTopic.id
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    console.log("Topic removed successfully:", data);
+                    
+                    // Close modal
+                    closeModal();
+                    
+                    // Reload the knowledge graph to reflect the removal
+                    await loadKnowledgeGraph();
+                    
+                    // Show success message
+                    alert(`Topic "${topicName}" removed successfully!`);
+                } else {
+                    console.error("Failed to remove topic:", data);
+                    alert(`Error: ${data.error || data.message || 'Failed to remove topic'}`);
+                }
+            } catch (error) {
+                console.error("Error removing topic:", error);
+                alert("Failed to remove topic. Please try again.");
+            } finally {
+                // Reset button state
+                removeTopicBtn.disabled = false;
+                removeTopicBtn.textContent = "🗑️ Remove Topic";
+            }
+        });
+    }
+    
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             if (isChatExpanded) {

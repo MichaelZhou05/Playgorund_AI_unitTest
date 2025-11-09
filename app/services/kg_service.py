@@ -159,6 +159,63 @@ def add_topic_to_graph(topic_name: str, corpus_id: str, existing_nodes: list, ex
     return (nodes_json, edges_json, data_json)
 
 
+def remove_topic_from_graph(topic_id: str, existing_nodes: list, existing_edges: list, existing_data: dict) -> tuple[str, str, str]:
+    """
+    Removes a topic from an existing knowledge graph.
+    
+    Args:
+        topic_id: ID of the topic to remove (e.g., 'topic_1')
+        existing_nodes: Current list of graph nodes
+        existing_edges: Current list of graph edges
+        existing_data: Current kg_data dictionary
+        
+    Returns:
+        Tuple of (updated_nodes_json, updated_edges_json, updated_data_json)
+    """
+    logger.info(f"Removing topic from graph: {topic_id}")
+    
+    # Find and verify the topic exists
+    topic_node = None
+    for node in existing_nodes:
+        if node.get('id') == topic_id:
+            if node.get('group') != 'topic':
+                raise ValueError(f"Node {topic_id} is not a topic node (group: {node.get('group')})")
+            topic_node = node
+            break
+    
+    if not topic_node:
+        raise ValueError(f"Topic {topic_id} not found in graph")
+    
+    logger.info(f"Found topic to remove: {topic_node.get('label')}")
+    
+    # Remove the topic node
+    updated_nodes = [node for node in existing_nodes if node.get('id') != topic_id]
+    
+    # Remove all edges connected to this topic (both incoming and outgoing)
+    updated_edges = [
+        edge for edge in existing_edges 
+        if edge.get('from') != topic_id and edge.get('to') != topic_id
+    ]
+    
+    # Remove the topic data
+    updated_data = {k: v for k, v in existing_data.items() if k != topic_id}
+    
+    # Calculate what was removed
+    nodes_removed = len(existing_nodes) - len(updated_nodes)
+    edges_removed = len(existing_edges) - len(updated_edges)
+    
+    logger.info(f"Removed {nodes_removed} node(s) and {edges_removed} edge(s)")
+    
+    # Serialize to JSON strings
+    nodes_json = json.dumps(updated_nodes)
+    edges_json = json.dumps(updated_edges)
+    data_json = json.dumps(updated_data)
+    
+    logger.info(f"Successfully removed topic '{topic_node.get('label')}' (ID: {topic_id})")
+    
+    return (nodes_json, edges_json, data_json)
+
+
 def build_knowledge_graph(topic_list: list, corpus_id: str, files: list) -> tuple[str, str, str]:
     """
     Builds the complete knowledge graph with topics, files, and connections.

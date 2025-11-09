@@ -424,7 +424,95 @@ def rate_answer():
     except Exception as e:
         logger.error(f"Failed to rate answer: {e}", exc_info=True)
         return jsonify({
-            "error": "Failed to record rating",
+            "error": "Failed to rate answer",
+            "message": str(e)
+        }), 500
+
+
+@app.route('/api/remove-topic', methods=['POST'])
+def remove_topic():
+    """
+    Removes a topic from an existing course knowledge graph.
+    
+    Request body:
+        {
+            "course_id": "12345",
+            "topic_id": "topic_1"
+        }
+    
+    Returns:
+        JSON response with updated graph data
+    """
+    try:
+        data = request.json
+        course_id = data.get('course_id')
+        topic_id = data.get('topic_id')
+        
+        if not course_id or not topic_id:
+            return jsonify({
+                "error": "Missing required fields: course_id and topic_id"
+            }), 400
+        
+        logger.info(f"Removing topic '{topic_id}' from course {course_id}")
+        
+        # Step 1: Get existing knowledge graph from Firestore
+        course_data = firestore_service.get_course_data(course_id)
+        
+        if not course_data.exists:
+            return jsonify({
+                "error": f"Course {course_id} not found"
+            }), 404
+        
+        data_dict = course_data.to_dict()
+        
+        # Check if course is active
+        if data_dict.get('status') != 'ACTIVE':
+            return jsonify({
+                "error": "Course must be in ACTIVE state to remove topics"
+            }), 400
+        
+        existing_nodes = json.loads(data_dict.get('kg_nodes', '[]'))
+        existing_edges = json.loads(data_dict.get('kg_edges', '[]'))
+        existing_data = json.loads(data_dict.get('kg_data', '{}'))
+        
+        logger.info(f"Current graph has {len(existing_nodes)} nodes, {len(existing_edges)} edges")
+        
+        # Step 2: Remove the topic using kg_service
+        updated_nodes_json, updated_edges_json, updated_data_json = kg_service.remove_topic_from_graph(
+            topic_id=topic_id,
+            existing_nodes=existing_nodes,
+            existing_edges=existing_edges,
+            existing_data=existing_data
+        )
+        
+        # Step 3: Update Firestore with new graph data
+        logger.info("Updating Firestore with new graph data...")
+        firestore_service.db.collection(firestore_service.COURSES_COLLECTION).document(course_id).update({
+            'kg_nodes': updated_nodes_json,
+            'kg_edges': updated_edges_json,
+            'kg_data': updated_data_json
+        })
+        
+        logger.info(f"Successfully removed topic '{topic_id}' from course {course_id}")
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Topic '{topic_id}' removed successfully",
+            "nodes": updated_nodes_json,
+            "edges": updated_edges_json,
+            "data": updated_data_json
+        })
+        
+    except ValueError as ve:
+        logger.error(f"Validation error: {ve}")
+        return jsonify({
+            "error": "Invalid request",
+            "message": str(ve)
+        }), 400
+    except Exception as e:
+        logger.error(f"Failed to remove topic: {e}", exc_info=True)
+        return jsonify({
+            "error": "Failed to remove topic",
             "message": str(e)
         }), 500
 

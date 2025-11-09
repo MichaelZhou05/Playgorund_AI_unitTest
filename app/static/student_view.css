@@ -143,9 +143,31 @@ body {
     padding: 10px 16px;
     border-radius: 8px;
     cursor: pointer;
+    transition: background-color 0.2s;
 }
 .btn-secondary:hover {
     background-color: #999;
+}
+
+.btn-danger {
+    background-color: #dc2626;
+    border: 1px solid #991b1b;
+    color: white;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-weight: 600;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background-color: #b91c1c;
+}
+
+.btn-danger:disabled {
+    background-color: #9ca3af;
+    cursor: not-allowed;
+    opacity: 0.6;
 }
 
 .modal-footer {
