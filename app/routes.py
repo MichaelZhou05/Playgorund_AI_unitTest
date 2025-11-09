@@ -3,7 +3,7 @@ Flask API Routes (ROLE 2: The "API Router")
 Handles all HTTP endpoints and connects frontend to core services.
 """
 from flask import request, render_template, jsonify, session, current_app as app
-from .services import firestore_service, rag_service, kg_service, canvas_service, gcs_service, gemini_service, analytics_logging_service, analytics_reporting_service
+from .services import firestore_service, rag_service, kg_service, canvas_service, gcs_service, gemini_service, analytics_logging_service
 import os
 import logging
 import shutil
@@ -148,12 +148,12 @@ def initialize_course():
             return jsonify({"error": "course_id is required"}), 400
         
         logger.info(f"Starting initialization for course {course_id}")
-        
+        logger.info(f"topics: {topics}")
         # Auto-extract topics if not provided
         if not topics or not any(t.strip() for t in topics.split(",")):
             logger.info("No topics provided, auto-extracting from syllabus...")
             syllabus_text = canvas_service.get_syllabus(course_id, CANVAS_TOKEN)
-            
+            logger.info(f"Syllabus Text: {syllabus_text}")
             if not syllabus_text or len(syllabus_text.strip()) < 100:
                 return jsonify({"error": "Cannot auto-generate: syllabus not found or too short"}), 400
             
@@ -301,6 +301,7 @@ def chat():
         "response": answer 
     })
 
+
 @app.route('/api/get-graph', methods=['GET'])
 def get_graph():
     """
@@ -427,6 +428,7 @@ def get_analytics(course_id):
     Returns cluster analysis and insights for professors.
     """
     try:
+        from .services import analytics_reporting_service
         
         report = analytics_reporting_service.get_analytics_report(course_id)
         
@@ -465,6 +467,8 @@ def run_analytics():
         }), 400
     
     try:
+        from .services import analytics_reporting_service
+        
         # Run analytics with auto-detection or specified clusters
         if n_clusters:
             report = analytics_reporting_service.run_daily_analytics(
@@ -485,4 +489,3 @@ def run_analytics():
             "error": "Failed to run analytics",
             "message": str(e)
         }), 500
-
