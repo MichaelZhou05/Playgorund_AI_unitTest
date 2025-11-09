@@ -86,8 +86,8 @@ button:hover {
     font-size: 62px;
     font-weight: 900;
     color: #1a1a1a;
-    margin-bottom: 60px;
-    text-transform: uppercase;
+    margin-bottom: 75px;
+    text-transform: none;
     letter-spacing: 2px;
     line-height: 1.2;
     white-space: nowrap;
@@ -110,24 +110,24 @@ button:hover {
     animation: google-speed 2s infinite ease-in-out;
 }
 
-/* Individual colors for each loader element (Google colors) */
+/* Individual colors for each loader element (matching background shapes theme) */
 .google-loader .loader-one {
-    background: #4285f4; /* Google Blue */
+    background: linear-gradient(135deg, #4dabf7, #1c7ed6); /* Blue - matches shape-4 */
     animation-delay: 1.5s;
 }
 
 .google-loader .loader-two {
-    background: #ea4335; /* Google Red */
+    background: linear-gradient(135deg, #ff6b6b, #ff8787); /* Red/Pink - matches shape-1 */
     animation-delay: 1s;
 }
 
 .google-loader .loader-three {
-    background: #fbbc05; /* Google Yellow */
+    background: linear-gradient(135deg, #ffd43b, #fab005); /* Yellow - matches shape-3 */
     animation-delay: 0.5s;
 }
 
 .google-loader .loader-four {
-    background: #34a853; /* Google Green */
+    background: linear-gradient(135deg, #51cf66, #37b24d); /* Green - matches shape-2 */
     animation-delay: 0s;
 }
 
