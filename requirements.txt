@@ -1,6 +1,7 @@
 # Flask
 Flask
 flask-cors
+gunicorn
 
 # Google Cloud
 google-cloud-firestore
