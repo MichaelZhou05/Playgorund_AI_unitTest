@@ -1,15 +1,16 @@
-version: '3.8'
-
 services:
-  playground-web:
+  web:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
       - "5000:5000"
     environment:
-      - FLASK_ENV=production
+      - FLASK_ENV=development
+      - FLASK_DEBUG=True
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/playground-service-account.json
     volumes:
+      - ./playground-service-account.json:/app/secrets/playground-service-account.json:ro
       - ./.env:/app/.env:ro
     restart: unless-stopped
     healthcheck:
