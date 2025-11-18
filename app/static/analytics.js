@@ -409,16 +409,29 @@ function closeModal() {
 // Generate distinct colors for charts
 function generateColors(count) {
     const baseColors = [
-        '#FF6384', // Red/Pink
-        '#36A2EB', // Blue
-        '#FFCE56', // Yellow
-        '#4BC0C0', // Teal
+        '#FF6384', // Coral Pink
+        '#36A2EB', // Sky Blue
+        '#FFCE56', // Sunny Yellow
+        '#4BC0C0', // Turquoise
         '#9966FF', // Purple
         '#FF9F40', // Orange
-        '#FF6384', // Red (repeat)
-        '#C9CBCF', // Gray
-        '#4BC0C0', // Teal (repeat)
-        '#FF9F40'  // Orange (repeat)
+        '#FF6B9D', // Hot Pink
+        '#95E1D3', // Mint Green
+        '#F38181', // Salmon
+        '#AA96DA', // Lavender
+        '#FCBAD3', // Light Pink
+        '#A8E6CF', // Seafoam Green
+        '#FFD3B6', // Peach
+        '#FFAAA5', // Coral
+        '#FF8B94', // Rose
+        '#A2D2FF', // Powder Blue
+        '#BDB2FF', // Periwinkle
+        '#FFC6FF', // Orchid
+        '#FDFFB6', // Lemon
+        '#CAFFBF', // Pistachio
+        '#9BF6FF', // Cyan
+        '#FEC89A', // Apricot
+        '#F9DCC4'  // Cream
     ];
 
     const colors = [];
