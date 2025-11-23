@@ -831,7 +831,7 @@ body {
 
 .chat-prompt {
     position: fixed;
-    bottom: 2rem;
+    bottom: 3rem;
     left: 50%;
     transform: translateX(-50%);
     z-index: 999;
@@ -839,12 +839,12 @@ body {
     align-items: center;
     gap: 0.75rem;
     background: rgba(255, 255, 255, 0.3);  /* Translucent by default */
-    padding: 0.4rem 1.25rem;  /* Reduced vertical padding for less height */
+    padding: 0.8rem 2rem;  /* Reduced vertical padding for less height */
     border-radius: 3rem;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
     backdrop-filter: blur(10px);
     transition: all 0.3s ease;
-    max-width: 850px;
+    max-width: 950px;
     width: calc(100% - 4rem);
 }
 
@@ -865,7 +865,7 @@ body {
     flex: 1;
     border: none;
     outline: none;
-    font-size: 1rem;
+    font-size: 1.2rem;
     background: transparent;
     color: var(--text-primary);
     font-family: inherit;
